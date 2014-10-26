@@ -17,38 +17,38 @@ template <typename T> class file_vector {
     using difference_type = ptrdiff_t;
     using size_type = size_t;
 
-    static size_type constexpr value_size = sizeof(T);
+    static size_type constexpr value_used = sizeof(T);
 
     string const name;
     size_type reserved;
-    size_type size;
+    size_type used;
     int fd;
-    pointer data;
+    pointer values;
 
 public:
     virtual ~file_vector() noexcept {
-        if (data != nullptr) {
-            munmap(data, reserved);
-            ftruncate(fd, size);
+        if (values != nullptr) {
+            munmap(values, reserved);
+            ftruncate(fd, used);
             ::close(fd);
-            data = nullptr;
-            size = 0;
+            values = nullptr;
+            used = 0;
         }
     }
 
     void close() {
-        if (data != nullptr) {
-            if (munmap(data, reserved) == -1) {
+        if (values != nullptr) {
+            if (munmap(values, reserved) == -1) {
                 throw runtime_error("Unable to munmap file when closing file_vector.");
             }
-            if (ftruncate(fd, size) == -1) {
-                throw runtime_error("Unable to resize file when closing file_vector.");
+            if (ftruncate(fd, used) == -1) {
+                throw runtime_error("Unable to reused file when closing file_vector.");
             }
             if (::close(fd) == -1) {
                 throw runtime_error("Unable to close file when closing file_vector.");
             }
-            data = nullptr;
-            size = 0;
+            values = nullptr;
+            used = 0;
         }
     }
 
@@ -60,14 +60,14 @@ public:
         }
     }
         
-    file_vector(string const& name, size_type const size = 0) : name(name), reserved(size) , size(size) {
+    file_vector(string const& name, size_type const used = 0) : name(name), reserved(used) , used(used) {
         fd = open(name.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
 
         if (fd == -1) {
             throw runtime_error("Unable to open file for file_vector.");
         }
 
-        if (ftruncate(fd, reserved * value_size) == -1) {
+        if (ftruncate(fd, reserved * value_used) == -1) {
             if (::close(fd) == -1) {
                 throw runtime_error("Unanble to close file after failing "
                     "to reserve memory for file_vector."
@@ -75,15 +75,15 @@ public:
             }
         }
 
-        data = static_cast<pointer>(mmap(nullptr
-        , reserved * value_size
+        values = static_cast<pointer>(mmap(nullptr
+        , reserved * value_used
         , PROT_READ | PROT_WRITE
         , MAP_SHARED
         , fd
         , 0
         ));
 
-        if (data == nullptr) {
+        if (values == nullptr) {
             if (::close(fd) == -1) {
                 throw runtime_error("Unanble close file after failing "
                     "to mmap file for file_vector."
@@ -106,68 +106,68 @@ public:
     
     class iterator {
         friend file_vector;
-        pointer data;
+        pointer values;
 
-        iterator(pointer data) : data(data)
+        iterator(pointer values) : values(values)
             {}
     public:
         // All Iterators
-        iterator(iterator const &that) : data(that.data)
+        iterator(iterator const &that) : values(that.values)
             {}
         iterator& operator= (iterator const &that)
-            {data = that.data; return *this;}
+            {values = that.values; return *this;}
         iterator& operator++ ()
-            {++data; return *this;}
+            {++values; return *this;}
         iterator operator++ (int)
-            {iterator i {*this}; ++data; return i;}
+            {iterator i {*this}; ++values; return i;}
 
         // Input
         bool operator== (iterator const &that) const
-            {return data == that.data;}
+            {return values == that.values;}
         bool operator!= (iterator const &that) const
-            {return data != that.data;}
+            {return values != that.values;}
         const_pointer operator-> () const
-            {return data;}
+            {return values;}
 
         // Output
         reference operator* () const
-            {return *data;}
+            {return *values;}
 
         // Bidirectional
         iterator& operator-- () 
-            {--data; return *this;}
+            {--values; return *this;}
         iterator operator-- (int)
-            {iterator i {*this}; --data; return i;}
+            {iterator i {*this}; --values; return i;}
 
         // Random Access
         difference_type operator- (iterator const &that) const
-            {return data - that.data;}
+            {return values - that.values;}
         iterator operator- (difference_type const n) const
-            {return iterator(data - n);}
+            {return iterator(values - n);}
         iterator operator+ (difference_type const n) const
-            {return iterator(data + n);}
+            {return iterator(values + n);}
         bool operator< (iterator const &that) const
-            {return data < that.data;}
+            {return values < that.values;}
         bool operator> (iterator const &that) const
-            {return data > that.data;}
+            {return values > that.values;}
         bool operator<= (iterator const &that) const   
-            {return data <= that.data;}
+            {return values <= that.values;}
         bool operator>= (iterator const &that) const
-            {return data >= that.data;}
+            {return values >= that.values;}
         iterator& operator += (difference_type const n)
-            {data += n; return *this;}
+            {values += n; return *this;}
         iterator& operator -= (difference_type const n)
-            {data -= n; return *this;}
+            {values -= n; return *this;}
         reference operator[] (difference_type offset) const
-            {return data[offset];}
+            {return values[offset];}
     };
 
     iterator begin() {
-        return iterator(data);
+        return iterator(values);
     }
 
     iterator end() {
-        return iterator(data + size);
+        return iterator(values + used);
     }
 
     //------------------------------------------------------------------------
@@ -175,68 +175,68 @@ public:
     
     class reverse_iterator {
         friend file_vector;
-        pointer data;
+        pointer values;
 
-        reverse_iterator(pointer data) : data(data)
+        reverse_iterator(pointer values) : values(values)
             {}
     public:
         // All Iterators
-        reverse_iterator(reverse_iterator const &that) : data(that.data)
+        reverse_iterator(reverse_iterator const &that) : values(that.values)
             {}
         reverse_iterator& operator= (reverse_iterator const &that)
-            {data = that.data; return *this;}
+            {values = that.values; return *this;}
         reverse_iterator& operator++ ()
-            {--data; return *this;}
+            {--values; return *this;}
         reverse_iterator operator++ (int)
-            {reverse_iterator i {*this}; --data; return i;}
+            {reverse_iterator i {*this}; --values; return i;}
 
         // Input
         bool operator== (reverse_iterator const &that) const
-            {return data == that.data;}
+            {return values == that.values;}
         bool operator!= (reverse_iterator const &that) const
-            {return data != that.data;}
+            {return values != that.values;}
         const_pointer operator-> () const
-            {return data;}
+            {return values;}
 
         // Output
         reference operator* () const
-            {return *data;}
+            {return *values;}
 
         // Bidirectional
         reverse_iterator& operator-- ()
-            {++data; return *this;}
+            {++values; return *this;}
         reverse_iterator operator-- (int)
-            {reverse_iterator i {*this}; ++data; return i;}
+            {reverse_iterator i {*this}; ++values; return i;}
 
         // Random Access
         difference_type operator- (reverse_iterator const &that)
-            {return that.data - data;}
+            {return that.values - values;}
         reverse_iterator operator- (difference_type const n)
-            {return reverse_iterator(data + n);}
+            {return reverse_iterator(values + n);}
         reverse_iterator operator+ (difference_type const n)
-            {return reverse_iterator(data - n);}
+            {return reverse_iterator(values - n);}
         bool operator< (reverse_iterator const &that) const
-            {return data > that.data;}
+            {return values > that.values;}
         bool operator> (reverse_iterator const &that) const
-            {return data < that.data;}
+            {return values < that.values;}
         bool operator<= (reverse_iterator const &that) const
-            {return data >= that.data;}
+            {return values >= that.values;}
         bool operator>= (reverse_iterator const &that) const
-            {return data <= that.data;}
+            {return values <= that.values;}
         reverse_iterator& operator += (difference_type const n)
-            {data -= n; return *this;}
+            {values -= n; return *this;}
         reverse_iterator& operator -= (difference_type const n)
-            {data += n; return *this;}
+            {values += n; return *this;}
         reference& operator[] (difference_type offset) const
-            {return data[offset];}
+            {return values[offset];}
     };
 
     reverse_iterator rbegin() {
-        return reverse_iterator(data + size - 1);
+        return reverse_iterator(values + used - 1);
     }
 
     reverse_iterator rend() {
-        return reverse_iterator(data - 1);
+        return reverse_iterator(values - 1);
     }
 
     //------------------------------------------------------------------------
@@ -244,66 +244,66 @@ public:
     
     class const_iterator {
         friend file_vector;
-        const_pointer data;
+        const_pointer values;
 
-        const_iterator(const_pointer data) : data(data)
+        const_iterator(const_pointer values) : values(values)
             {}
     public:
         // All Iterators
-        const_iterator(const_iterator const &that) : data(that.data)
+        const_iterator(const_iterator const &that) : values(that.values)
             {}
         const_iterator& operator= (const_iterator const &that)
-            {data = that.data; return *this;}
+            {values = that.values; return *this;}
         const_iterator& operator++ ()
-            {++data; return *this;}
+            {++values; return *this;}
         const_iterator operator++ (int)
-            {const_iterator i {*this}; ++data; return i;}
+            {const_iterator i {*this}; ++values; return i;}
 
         // Input
         bool operator== (const_iterator const &that) const
-            {return data == that.data;}
+            {return values == that.values;}
         bool operator!= (const_iterator const &that) const
-            {return data != that.data;}
+            {return values != that.values;}
         const_pointer operator-> () const
-            {return data;}
+            {return values;}
         const_reference operator* () const
-            {return *data;}
+            {return *values;}
 
         // Bidirectional
         const_iterator& operator-- () 
-            {--data; return *this;}
+            {--values; return *this;}
         const_iterator operator-- (int) 
-            {const_iterator i {*this}; --data; return i;}
+            {const_iterator i {*this}; --values; return i;}
 
         // Random Access
         difference_type operator- (const_iterator const &that) const
-            {return data - that.data;}
+            {return values - that.values;}
         const_iterator operator- (difference_type const n) const
-            {return const_iterator {data - n};}
+            {return const_iterator {values - n};}
         const_iterator operator+ (difference_type const n) const
-            {return const_iterator {data + n};}
+            {return const_iterator {values + n};}
         bool operator< (const_iterator const &that) const
-            {return data < that.data;}
+            {return values < that.values;}
         bool operator> (const_iterator const &that) const
-            {return data > that.data;}
+            {return values > that.values;}
         bool operator<= (const_iterator const &that) const
-            {return data <= that.data;}
+            {return values <= that.values;}
         bool operator>= (const_iterator const &that) const
-            {return data >= that.data;}
+            {return values >= that.values;}
         const_iterator& operator += (difference_type const n)
-            {data += n; return *this;}
+            {values += n; return *this;}
         const_iterator& operator -= (difference_type const n)
-            {data -= n; return *this;}
+            {values -= n; return *this;}
         const_reference operator[] (difference_type offset) const
-            {return data[offset];}
+            {return values[offset];}
     };
 
     const_iterator cbegin() {
-        return const_iterator(data);
+        return const_iterator(values);
     }
 
     const_iterator cend() {
-        return const_iterator(data + size);
+        return const_iterator(values + used);
     }
 
     //------------------------------------------------------------------------
@@ -311,74 +311,74 @@ public:
     
     class const_reverse_iterator {
         friend file_vector;
-        const_pointer data;
+        const_pointer values;
 
-        const_reverse_iterator(const_pointer data) : data(data)
+        const_reverse_iterator(const_pointer values) : values(values)
             {}
     public:
         // All Iterators
-        const_reverse_iterator(const_reverse_iterator const &that) : data(that.data)
+        const_reverse_iterator(const_reverse_iterator const &that) : values(that.values)
             {}
         const_reverse_iterator& operator= (const_reverse_iterator const &that)
-            {data = that.data; return *this;}
+            {values = that.values; return *this;}
         const_reverse_iterator& operator++ ()
-            {--data; return *this;}
+            {--values; return *this;}
         const_reverse_iterator operator++ (int)
-            {const_reverse_iterator i {*this}; --data; return i;}
+            {const_reverse_iterator i {*this}; --values; return i;}
 
         // Input
         bool operator== (const_reverse_iterator const &that) const
-            {return data == that.data;}
+            {return values == that.values;}
         bool operator!= (const_reverse_iterator const &that) const
-            {return data != that.data;}
+            {return values != that.values;}
         const_pointer operator-> () const
-            {return data;}
+            {return values;}
         const_reference operator* () const
-            {return *data;}
+            {return *values;}
 
         // Bidirectional
         const_reverse_iterator& operator-- () 
-            {++data; return *this;}
+            {++values; return *this;}
         const_reverse_iterator operator-- (int) 
-            {const_reverse_iterator i {*this}; ++data; return i;}
+            {const_reverse_iterator i {*this}; ++values; return i;}
 
         // Random Access
         difference_type operator- (const_reverse_iterator const &that) const
-            {return that.data - data;}
+            {return that.values - values;}
         const_reverse_iterator operator- (difference_type const n) const
-            {return const_reverse_iterator {data + n};}
+            {return const_reverse_iterator {values + n};}
         const_reverse_iterator operator+ (difference_type const n) const
-            {return const_reverse_iterator {data - n};}
+            {return const_reverse_iterator {values - n};}
         bool operator< (const_reverse_iterator const &that) const
-            {return data > that.data;}
+            {return values > that.values;}
         bool operator> (const_reverse_iterator const &that) const
-            {return data < that.data;}
+            {return values < that.values;}
         bool operator<= (const_reverse_iterator const &that) const
-            {return data >= that.data;}
+            {return values >= that.values;}
         bool operator>= (const_reverse_iterator const &that) const
-            {return data <= that.data;}
+            {return values <= that.values;}
         const_reverse_iterator& operator += (difference_type const n)
-            {data -= n; return *this;}
+            {values -= n; return *this;}
         const_reverse_iterator& operator -= (difference_type const n)
-            {data += n; return *this;}
+            {values += n; return *this;}
         const_reference operator[] (difference_type offset) const
-            {return data[offset];}
+            {return values[offset];}
     };
 
     const_reverse_iterator crbegin() {
-        return const_reverse_iterator(data + size - 1);
+        return const_reverse_iterator(values + used - 1);
     }
 
     const_reverse_iterator crend() {
-        return const_reverse_iterator(data - 1);
+        return const_reverse_iterator(values - 1);
     }
 
     //------------------------------------------------------------------------
     // Capacity
     
-    /*size_t size() const {
-        return size;
-    }*/
+    size_type size() const {
+        return used;
+    }
 
     size_type capacity() const {
         return reserved;
@@ -386,24 +386,24 @@ public:
 
     void reserve(size_type const new_reserved) {
         if (new_reserved != reserved) {
-            if (ftruncate(fd, new_reserved * value_size) == -1) {
+            if (ftruncate(fd, new_reserved * value_used) == -1) {
                 throw runtime_error("Unanble to extend memory for file_vector.");
             }
 
-            pointer new_data = static_cast<pointer>(mmap(nullptr
-            , new_reserved * value_size
+            pointer new_values = static_cast<pointer>(mmap(nullptr
+            , new_reserved * value_used
             , PROT_READ | PROT_WRITE
             , MAP_SHARED
             , fd
             , 0
             ));
 
-            if (new_data == nullptr) {
+            if (new_values == nullptr) {
                 throw runtime_error("Unable to mmap file for file_vector.");
             }
 
-            if (munmap(data, reserved) == -1) {
-                if (munmap(new_data, new_reserved) == -1) {
+            if (munmap(values, reserved) == -1) {
+                if (munmap(new_values, new_reserved) == -1) {
                     throw runtime_error(
                         "Unable to munmap file while "
                         "handling failed munmap for file_vector."
@@ -412,103 +412,103 @@ public:
                 throw runtime_error("Unable to munmap file for file_vector.");
             }
 
-            data = new_data;
+            values = new_values;
             reserved = new_reserved;
         }
     }
 
-    void resize(size_type const new_size) {
-        if (new_size > reserved) {
+    void reused(size_type const new_used) {
+        if (new_used > reserved) {
             reserve(reserved + reserved);
-        } else if (new_size < reserved) {
-            reserve(new_size);
+        } else if (new_used < reserved) {
+            reserve(new_used);
         }
-        size = new_size;
+        used = new_used;
     }
 
     bool empty() const {
-        return size == 0;
+        return used == 0;
     }
 
     void shrink_to_fit() {
-        reserve(size);
+        reserve(used);
     }
 
     //------------------------------------------------------------------------
     // Element Access
 
     const_reference operator[] (int const i) const {
-        return data[i];
+        return values[i];
     }
 
     reference operator[] (int const i) {
-        return data[i];
+        return values[i];
     }
 
     const_reference at(int const i) const {
-        if (i < 0 || i >= size) {
+        if (i < 0 || i >= used) {
             throw out_of_range("file_vector::at(int)");
         } 
-        return data[i];
+        return values[i];
     }
 
     reference at(int const i) {
-        if (i < 0 || i >= size) {
+        if (i < 0 || i >= used) {
             throw out_of_range("file_vector::at(int)");
         } 
-        return data[i];
+        return values[i];
     }
 
     const_reference front() const {
-        return data[0];
+        return values[0];
     }
 
     reference front() {
-        return data[0];
+        return values[0];
     }
 
     const_reference back() const {
-        return data[size - 1];
+        return values[used - 1];
     }
 
     reference back() {
-        return data[size - 1];
+        return values[used - 1];
     }
 
-    /*const_pointer data() const noexcept {
-        return data;
+    const_pointer data() const noexcept {
+        return values;
     }
 
     pointer data() noexcept {
-        return data;
-    }*/
+        return values;
+    }
 
     //------------------------------------------------------------------------
     // Modifiers
     
     // template <typename I> void assign(I first, I last) {}
     // void assign(initializer_list<value_type> l) {}
-    void assign(size_type const size, const_reference value) {
-        resize(size);
-        for (int i = 0; i < size; ++i) {
-            data[i] = value;
+    void assign(size_type const used, const_reference value) {
+        reused(used);
+        for (int i = 0; i < used; ++i) {
+            values[i] = value;
         }
     }
 
     void push_back(const_reference value) {
-        if (size >= reserved) {
-            reserve(size + size);
+        if (used >= reserved) {
+            reserve(used + used);
         }
-        data[size++] = value;
+        values[used++] = value;
     }
 
     void pop_back() {
-        --size;
+        --used;
         // need to delete
     }
 
     void clear() {
-        size = 0;
+        used = 0;
         // need to delete
     }
 
