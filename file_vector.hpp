@@ -90,24 +90,26 @@ template <typename T> class file_vector {
         }
     };
 
-    void open_for_write(size_type size, size_type capacity) {
-        fd = open(name.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
+    void open() {
+        fd = ::open(name.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
 
         if (fd == -1) {
             throw runtime_error("Unable to open file for file_vector.");
         }
 
-        reserved = capacity;
-        used = size;
+        size_type size = lseek(fd, 0, SEEK_END);
 
-        if (ftruncate(fd, reserved * value_size) == -1) {
+        if (size == -1) {
             if (::close(fd) == -1) {
                 throw runtime_error("Unanble to close file after failing "
-                    "to reserve memory for file_vector."
+                    "to get length of file for file_vector."
                 );
             }
-            throw runtime_error("Unable to eserve memory for file_vector.");
+            throw runtime_error("Unanble to get length of file for file_vector.");
         }
+
+        used = size / value_size;
+        reserved = size / value_size;
 
         values = static_cast<pointer>(mmap(nullptr
         , reserved * value_size
@@ -128,6 +130,30 @@ template <typename T> class file_vector {
     }
 
 public:
+    file_vector(string const& name) : name(name) {
+        open();
+    }
+
+    file_vector(string const& name, const int n) : name(name) {
+        open();
+        resize(n);
+    }
+
+    file_vector(string const& name, const int n, const_reference value) : name(name) {
+        open();
+        assign(n, value);
+    }
+
+    file_vector(string const& name, file_vector const& from) : name(name) {
+        open();
+        assign(from.cbegin(), from.cend());
+    }
+
+    file_vector(string const& name, initializer_list<value_type> const& list) : name(name) {
+        open();
+        assign(list);
+    }
+
     virtual ~file_vector() noexcept {
         if (values != nullptr) {
             munmap(values, reserved);
@@ -152,70 +178,6 @@ public:
             values = nullptr;
             used = 0;
         }
-    }
-
-    file_vector(string const& name) : name(name) {
-        fd = open(name.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
-
-        if (fd == -1) {
-            throw runtime_error("Unable to open file for file_vector.");
-        }
-
-        size_type size = lseek(fd, 0, SEEK_END);
-
-        if (size == -1) {
-            if (::close(fd) == -1) {
-                throw runtime_error("Unanble to close file after failing "
-                    "to get length of file for file_vector."
-                );
-            }
-            throw runtime_error("Unanble to get length of file for file_vector.");
-        }
-
-        used = size / value_size;
-
-        if (used > 0) {
-            reserved = used;
-        } else {
-            reserved = 1;
-
-            if (ftruncate(fd, reserved * value_size) == -1) {
-                if (::close(fd) == -1) {
-                    throw runtime_error("Unanble to close file after failing "
-                        "to reserve memory for file_vector."
-                    );
-                }
-                throw runtime_error("Unable to eserve memory for file_vector.");
-            }
-        }
-
-        values = static_cast<pointer>(mmap(nullptr
-        , reserved * value_size
-        , PROT_READ | PROT_WRITE
-        , MAP_SHARED
-        , fd
-        , 0
-        ));
-
-        if (values == nullptr) {
-            if (::close(fd) == -1) {
-                throw runtime_error("Unanble close file after failing "
-                    "to mmap file for file_vector."
-                );
-            }
-            throw runtime_error("Unable to mmap file for file_vector.");
-        }
-    }
-
-    file_vector(string const& name, file_vector const& from) : name(name) {
-        open_for_write(from.size(), from.capacity());
-        assign(from.cbegin(), from.cend());
-    }
-
-    file_vector(string const& name, initializer_list<value_type> const& list) : name(name) {
-        size_type size = list.size();
-        open_for_write(size, (size > 0) ? size : 1);
-        assign(list);
     }
 
     // value equality.
