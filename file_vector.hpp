@@ -17,7 +17,7 @@ template <typename T> class file_vector {
     using difference_type = ptrdiff_t;
     using size_type = size_t;
 
-    static size_type constexpr value_used = sizeof(T);
+    static size_type constexpr value_size = sizeof(T);
 
     string const name;
     size_type reserved;
@@ -29,7 +29,7 @@ public:
     virtual ~file_vector() noexcept {
         if (values != nullptr) {
             munmap(values, reserved);
-            ftruncate(fd, used);
+            ftruncate(fd, used * value_size);
             ::close(fd);
             values = nullptr;
             used = 0;
@@ -38,10 +38,10 @@ public:
 
     void close() {
         if (values != nullptr) {
-            if (munmap(values, reserved) == -1) {
+            if (munmap(values, reserved * value_size) == -1) {
                 throw runtime_error("Unable to munmap file when closing file_vector.");
             }
-            if (ftruncate(fd, used) == -1) {
+            if (ftruncate(fd, used * value_size) == -1) {
                 throw runtime_error("Unable to reused file when closing file_vector.");
             }
             if (::close(fd) == -1) {
@@ -60,14 +60,17 @@ public:
         }
     }
         
-    file_vector(string const& name, size_type const used = 0) : name(name), reserved(used) , used(used) {
+    file_vector(string const& name, size_type const size = 0) : name(name)
+    , reserved(size)
+    , used(size)
+    {
         fd = open(name.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
 
         if (fd == -1) {
             throw runtime_error("Unable to open file for file_vector.");
         }
 
-        if (ftruncate(fd, reserved * value_used) == -1) {
+        if (ftruncate(fd, reserved * value_size) == -1) {
             if (::close(fd) == -1) {
                 throw runtime_error("Unanble to close file after failing "
                     "to reserve memory for file_vector."
@@ -76,7 +79,7 @@ public:
         }
 
         values = static_cast<pointer>(mmap(nullptr
-        , reserved * value_used
+        , reserved * value_size
         , PROT_READ | PROT_WRITE
         , MAP_SHARED
         , fd
@@ -111,6 +114,12 @@ public:
         iterator(pointer values) : values(values)
             {}
     public:
+        using difference_type = difference_type;
+        using value_type = value_type;
+        using reference = reference;
+        using pointer = pointer;
+        using iterator_category = random_access_iterator_tag;
+
         // All Iterators
         iterator(iterator const &that) : values(that.values)
             {}
@@ -180,6 +189,12 @@ public:
         reverse_iterator(pointer values) : values(values)
             {}
     public:
+        using difference_type = difference_type;
+        using value_type = value_type;
+        using reference = reference;
+        using pointer = pointer;
+        using iterator_category = random_access_iterator_tag;
+
         // All Iterators
         reverse_iterator(reverse_iterator const &that) : values(that.values)
             {}
@@ -249,6 +264,12 @@ public:
         const_iterator(const_pointer values) : values(values)
             {}
     public:
+        using difference_type = difference_type;
+        using value_type = value_type;
+        using reference = const_reference;
+        using pointer = const_pointer;
+        using iterator_category = random_access_iterator_tag;
+
         // All Iterators
         const_iterator(const_iterator const &that) : values(that.values)
             {}
@@ -316,6 +337,12 @@ public:
         const_reverse_iterator(const_pointer values) : values(values)
             {}
     public:
+        using difference_type = difference_type;
+        using value_type = value_type;
+        using reference = const_reference;
+        using pointer = const_pointer;
+        using iterator_category = random_access_iterator_tag;
+
         // All Iterators
         const_reverse_iterator(const_reverse_iterator const &that) : values(that.values)
             {}
@@ -386,12 +413,12 @@ public:
 
     void reserve(size_type const new_reserved) {
         if (new_reserved != reserved) {
-            if (ftruncate(fd, new_reserved * value_used) == -1) {
+            if (ftruncate(fd, new_reserved * value_size) == -1) {
                 throw runtime_error("Unanble to extend memory for file_vector.");
             }
 
             pointer new_values = static_cast<pointer>(mmap(nullptr
-            , new_reserved * value_used
+            , new_reserved * value_size
             , PROT_READ | PROT_WRITE
             , MAP_SHARED
             , fd
@@ -402,7 +429,7 @@ public:
                 throw runtime_error("Unable to mmap file for file_vector.");
             }
 
-            if (munmap(values, reserved) == -1) {
+            if (munmap(values, reserved * value_size) == -1) {
                 if (munmap(new_values, new_reserved) == -1) {
                     throw runtime_error(
                         "Unable to munmap file while "
@@ -417,7 +444,7 @@ public:
         }
     }
 
-    void reused(size_type const new_used) {
+    void resize(size_type const new_used) {
         if (new_used > reserved) {
             reserve(reserved + reserved);
         } else if (new_used < reserved) {
@@ -486,10 +513,19 @@ public:
     //------------------------------------------------------------------------
     // Modifiers
     
-    // template <typename I> void assign(I first, I last) {}
+    /*template <typename InputIterator> void assign(InputIterator first, InputIterator last) {
+        //copy(first, last, begin());
+        
+        iterator dest {begin()};
+        while (first != last) {
+            *dest = *first;
+            ++first;
+        }
+    }*/
+
     // void assign(initializer_list<value_type> l) {}
     void assign(size_type const used, const_reference value) {
-        reused(used);
+        resize(used);
         for (int i = 0; i < used; ++i) {
             values[i] = value;
         }

@@ -23,13 +23,19 @@ int main() {
     size_t const page_size = getpagesize();
     file_vector<int> vector_test1("test1", page_size);
 
-    for (int i = 0; i < page_size; ++i) {
-        vector_test1[i] = i;    
-        assert(vector_test1[i] == i);    
-    }
+    vector_test1.clear();
+
+    assert(vector_test1.size() == 0);
 
     for (int i = 0; i < page_size; ++i) {
-        assert(vector_test1[i] == i);    
+        vector_test1.push_back(i);    
+        assert(vector_test1.at(i) == i);    
+    }
+
+    assert(vector_test1.size() == page_size);
+
+    for (int i = 0; i < page_size; ++i) {
+        assert(vector_test1.at(i) == i);    
     }
 
     for (
@@ -37,26 +43,41 @@ int main() {
         i != vector_test1.end();
         ++i
     ) {
-        *i = 0;
-        assert(*i == 0);
+        *i = 1;
+        assert(*i == 1);
     }
 
+    assert(vector_test1.size() == page_size);
+     
     for (
         file_vector<int>::const_reverse_iterator i {vector_test1.crbegin()};
         i != vector_test1.crend();
         ++i
     ) {
-        assert(*i == 0);
+        assert(*i == 1);
     }
+
+    assert(vector_test1.size() == page_size);
+     
+    for (int i = 0; i < page_size; ++i) {
+        assert(vector_test1.at(i) == 1);    
+    }
+
+    assert(vector_test1.size() == page_size);
 
     for (int i = 0; i < page_size; ++i) {
-        vector_test1.push_back(page_size + i);   
+        vector_test1.push_back(2);   
     }
 
+    assert(vector_test1.size() == 2 * page_size);
+     
     test_out_of_range(vector_test1, 2 * page_size);
 
-oore_done:
+    //file_vector<int> vector_test2("test2", 2 * page_size);
+    //vector_test2.assign(vector_test1.cbegin(), vector_test1.cend());
+    //cout << vector_test1.cend() - vector_test1.cbegin() << "\n";
 
     vector_test1.close();
+    //vector_test2.close();
     cout << "Done." << endl;
 }
