@@ -60,10 +60,15 @@ public:
         }
     }
         
-    file_vector(string const& name, size_type const size = 0) : name(name)
-    , reserved(size)
-    , used(size)
-    {
+    file_vector(string const& name, size_type size = 0) : name(name) {
+        static size_type const page_size = getpagesize();
+
+        if (size == 0) {
+            size = page_size;
+        }
+        used = 0;
+        reserved = size;
+
         fd = open(name.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
 
         if (fd == -1) {
@@ -447,9 +452,7 @@ public:
     void resize(size_type const new_used) {
         if (new_used > reserved) {
             reserve(reserved + reserved);
-        } else if (new_used < reserved) {
-            reserve(new_used);
-        }
+        } 
         used = new_used;
     }
 
@@ -514,6 +517,10 @@ public:
     // Modifiers
     
     template <typename InputIterator> void assign(InputIterator first, InputIterator last) {
+        difference_type const size = last - first;
+        if (size > used) {
+            resize(size);
+        }
         copy(first, last, begin());
     }
 

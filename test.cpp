@@ -21,7 +21,7 @@ void test_out_of_range(file_vector<int>& fv, int const i) {
 
 int main() {
     size_t const page_size = getpagesize();
-    file_vector<int> vector_test1("test1", page_size);
+    file_vector<int> vector_test1("test1");
 
     vector_test1.clear();
 
@@ -73,7 +73,7 @@ int main() {
      
     test_out_of_range(vector_test1, 2 * page_size);
 
-    file_vector<int> vector_test2("test2", 2 * page_size);
+    file_vector<int> vector_test2("test2");
     vector_test2.assign(vector_test1.cbegin(), vector_test1.cend());
 
     vector_test1.close();
