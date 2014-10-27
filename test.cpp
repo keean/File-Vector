@@ -79,4 +79,17 @@ int main() {
     vector_test1.close();
     vector_test2.close();
     cout << "Done." << endl;
+
+    struct int_obj {
+        int x;
+        int_obj(int x) : x(x) {}
+        ~int_obj() {x = 0;}
+    };
+
+    int_obj io {3};
+    file_vector<int_obj> vector_test3("test3");
+    for (int i = 0; i < page_size; ++i) {
+        vector_test3.push_back(io);   
+    }
+    vector_test3.close();
 }

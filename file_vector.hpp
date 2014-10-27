@@ -1,4 +1,5 @@
 #include <stdexcept>
+#include <type_traits>
 
 extern "C" {
     #include <unistd.h>
@@ -24,6 +25,29 @@ template <typename T> class file_vector {
     size_type used;
     int fd;
     pointer values;
+
+    template<typename U, typename E = void> struct destroy;
+
+    template<typename U>
+    struct destroy<U, typename enable_if<!is_class<U>::value || is_pod<U>::value>::type> {
+        static void single(reference value) {}
+        static void many(pointer first, pointer last) {
+            cout << "no destructor." << endl;
+        }
+    };
+
+    template<typename U>
+    struct destroy<U, typename enable_if<is_class<U>::value && !is_pod<U>::value>::type> {
+        static void single(reference value) {
+            value.~value_type();
+        }
+        static void many(pointer first, pointer last) {
+            while (first < last) {
+                first++->~value_type();
+            }
+            cout << "destroyed." << endl;
+        }
+    };
 
 public:
     virtual ~file_vector() noexcept {
@@ -535,13 +559,12 @@ public:
     }
 
     void pop_back() {
-        --used;
-        // need to delete
+        destroy<value_type>::single(values[used--]);
     }
 
     void clear() {
+        destroy<value_type>::many(values, values + used);
         used = 0;
-        // need to delete
     }
 
     //------------------------------------------------------------------------
