@@ -103,4 +103,11 @@ int main() {
     vector_test3.close();
     vector_test4.close();
     vector_test5.close();
+
+    file_vector<int> vector_test6("test6");
+    vector_test6.assign({1,2,3,4,5,6,7,8,9});
+    vector_test6.close();
+
+    file_vector<int> vector_test7("test7", {9,8,7,6,5,4,3,2,1,0});
+    vector_test7.close();
 }
