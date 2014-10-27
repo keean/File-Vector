@@ -3,6 +3,7 @@
 
 extern "C" {
     #include <unistd.h>
+    #include <stdio.h>
     #include <sys/mman.h>
     #include <fcntl.h>
 }
@@ -26,11 +27,51 @@ template <typename T> class file_vector {
     int fd;
     pointer values;
 
+    template<typename U, typename E = void> struct construct;
+
+    template<typename U>
+    struct construct<U, typename enable_if<!is_class<U>::value || is_pod<U>::value>::type> {
+        static void single(pointer value) {}
+        static void single(pointer value, const_reference from) {
+            *value = from;
+        }
+        static void many(pointer first, pointer last) {
+            cout << "no constructor." << endl;
+        }
+        static void many(pointer first, pointer last, const_reference from) {
+            while (first < last) {
+                *first++ = from;
+            }
+        }
+    };
+
+    template<typename U>
+    struct construct<U, typename enable_if<is_class<U>::value && !is_pod<U>::value>::type> {
+        static void single(pointer value) {
+            new (static_cast<void*>(value)) value_type();
+        }
+        static void single(pointer value, const_reference from) {
+            new (static_cast<void*>(value)) value_type(from);
+        }
+        static void many(pointer first, pointer last) {
+            while (first < last) {
+                new (static_cast<void*>(first++)) value_type();
+            }
+            cout << "default constructed." << endl;
+        }
+        static void many(pointer first, pointer last, const_reference from) {
+            while (first < last) {
+                new (static_cast<void*>(first++)) value_type(from);
+            }
+            cout << "copy constructed." << endl;
+        }
+    };
+    
     template<typename U, typename E = void> struct destroy;
 
     template<typename U>
     struct destroy<U, typename enable_if<!is_class<U>::value || is_pod<U>::value>::type> {
-        static void single(reference value) {}
+        static void single(pointer value) {}
         static void many(pointer first, pointer last) {
             cout << "no destructor." << endl;
         }
@@ -38,8 +79,8 @@ template <typename T> class file_vector {
 
     template<typename U>
     struct destroy<U, typename enable_if<is_class<U>::value && !is_pod<U>::value>::type> {
-        static void single(reference value) {
-            value.~value_type();
+        static void single(pointer value) {
+            value->~value_type();
         }
         static void many(pointer first, pointer last) {
             while (first < last) {
@@ -76,31 +117,41 @@ public:
         }
     }
 
-    file_vector(string const& name, const_reference src) {
-        fd = open(name.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
-
-        if (fd == -1) {
-            throw runtime_error("Unable to open file for file_vector.");
-        }
-    }
-        
-    file_vector(string const& name, size_type size = 1) : name(name)
-    , used(0)
-    , reserved((size > 0) ? size : 1)
-    {
+    file_vector(string const& name) : name(name) {
         fd = open(name.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
 
         if (fd == -1) {
             throw runtime_error("Unable to open file for file_vector.");
         }
 
-        if (ftruncate(fd, reserved * value_size) == -1) {
+        size_type size = lseek(fd, 0, SEEK_END);
+
+        if (size == -1) {
             if (::close(fd) == -1) {
                 throw runtime_error("Unanble to close file after failing "
-                    "to reserve memory for file_vector."
+                    "to get length of file for file_vector."
                 );
             }
+            throw runtime_error("Unanble to get length of file for file_vector.");
         }
+
+        used = size / value_size;
+
+        if (used > 0) {
+            reserved = used;
+        } else {
+            reserved = 1;
+
+            if (ftruncate(fd, reserved * value_size) == -1) {
+                if (::close(fd) == -1) {
+                    throw runtime_error("Unanble to close file after failing "
+                        "to reserve memory for file_vector."
+                    );
+                }
+                throw runtime_error("Unable to eserve memory for file_vector.");
+            }
+        }
+
 
         values = static_cast<pointer>(mmap(nullptr
         , reserved * value_size
@@ -120,13 +171,25 @@ public:
         }
     }
 
-    bool operator== (reference that) {
-        return name == that.name;
+    // value equality.
+    bool operator== (const_reference that) const {
+        if (used != that.used) {
+            return false;
+        }
+        const_iterator x = values;
+        const_iterator y = that.values;
+        for (int i = 0; i < used; ++i) {
+            if (*x++ != *y++) {
+                return false;
+            }
+        }
+        return true;
     }
 
-    reference operator= (const_reference src) {
-        //close();
-    }
+    /*reference operator= (const_reference src) {
+        assign(src.cbegin(), src.cend());
+        return *this;
+    }*/
 
     //------------------------------------------------------------------------
     // Iterator
@@ -472,9 +535,26 @@ public:
         if (new_used > reserved) {
             reserve(new_used);
         } 
+        if (new_used < used) {
+            destroy<value_type>::many(new_used, used);
+        } else if (new_used > used) {
+            construct<value_type>::many(used, new_used);
+        }
         used = new_used;
     }
 
+    void resize(size_type const new_used, const_reference def) {
+        if (new_used > reserved) {
+            reserve(new_used);
+        } 
+        if (new_used < used) {
+            destroy<value_type>::many(new_used, used);
+        } else if (new_used > used) {
+            construct<value_type>::many(used, new_used, def);
+        }
+        used = new_used;
+    }
+        
     bool empty() const {
         return used == 0;
     }
@@ -535,19 +615,31 @@ public:
     //------------------------------------------------------------------------
     // Modifiers
     
+    // void assign(initializer_list<value_type> l) {}
+
     template <typename InputIterator> void assign(InputIterator first, InputIterator last) {
         difference_type const size = last - first;
+        if (size > reserved) {
+            reserve(size);
+        } 
         if (size > used) {
-            resize(size);
+            used = size;
         }
         copy(first, last, begin());
     }
 
-    // void assign(initializer_list<value_type> l) {}
-    void assign(size_type const used, const_reference value) {
-        resize(used);
-        for (int i = 0; i < used; ++i) {
-            values[i] = value;
+    void assign(size_type const size, const_reference value) {
+        if (size > reserved) {
+            reserve(size);
+        } 
+        if (size > used) {
+            fill(begin(), end(), value);
+            resize(size, value);
+        } else {
+            if (size < used) {
+                resize(size);
+            }
+            fill(begin(), end(), value);
         }
     }
 
@@ -555,11 +647,11 @@ public:
         if (used >= reserved) {
             reserve(used + used);
         }
-        values[used++] = value;
+        construct<value_type>::single(values + (used++), value);
     }
 
     void pop_back() {
-        destroy<value_type>::single(values[used--]);
+        destroy<value_type>::single(values + (used--));
     }
 
     void clear() {

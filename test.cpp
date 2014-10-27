@@ -91,5 +91,11 @@ int main() {
     for (int i = 0; i < page_size; ++i) {
         vector_test3.push_back(io);   
     }
+
+    file_vector<int_obj> vector_test4("test4");
+    vector_test4.assign(vector_test3.cbegin(), vector_test3.cend());
+    //vector_test4 = vector_test3;
+
     vector_test3.close();
+    vector_test4.close();
 }
