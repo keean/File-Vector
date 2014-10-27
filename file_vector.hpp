@@ -513,15 +513,9 @@ public:
     //------------------------------------------------------------------------
     // Modifiers
     
-    /*template <typename InputIterator> void assign(InputIterator first, InputIterator last) {
-        //copy(first, last, begin());
-        
-        iterator dest {begin()};
-        while (first != last) {
-            *dest = *first;
-            ++first;
-        }
-    }*/
+    template <typename InputIterator> void assign(InputIterator first, InputIterator last) {
+        copy(first, last, begin());
+    }
 
     // void assign(initializer_list<value_type> l) {}
     void assign(size_type const used, const_reference value) {

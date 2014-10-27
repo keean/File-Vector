@@ -73,11 +73,10 @@ int main() {
      
     test_out_of_range(vector_test1, 2 * page_size);
 
-    //file_vector<int> vector_test2("test2", 2 * page_size);
-    //vector_test2.assign(vector_test1.cbegin(), vector_test1.cend());
-    //cout << vector_test1.cend() - vector_test1.cbegin() << "\n";
+    file_vector<int> vector_test2("test2", 2 * page_size);
+    vector_test2.assign(vector_test1.cbegin(), vector_test1.cend());
 
     vector_test1.close();
-    //vector_test2.close();
+    vector_test2.close();
     cout << "Done." << endl;
 }
