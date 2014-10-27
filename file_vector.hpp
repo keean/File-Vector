@@ -136,7 +136,7 @@ public:
 
     file_vector(string const& name, const int n) : name(name) {
         open();
-        resize(n);
+        assign(n);
     }
 
     file_vector(string const& name, const int n, const_reference value) : name(name) {
@@ -637,6 +637,27 @@ public:
             used = size;
         }
         copy(first, last, begin());
+    }
+
+    void assign(size_type const size) {
+        if (size > reserved) {
+            reserve(size);
+        }
+        if (size > used) {
+            value_type tmp;
+            for (iterator i = begin(); i != end(); ++i) {
+                *i = tmp;
+            }
+            resize(size);
+        } else {
+            if (size < used) {
+                resize(size);
+            }
+            value_type tmp;
+            for (iterator i = begin(); i != end(); ++i) {
+                *i = tmp;
+            }
+        }
     }
 
     void assign(size_type const size, const_reference value) {
