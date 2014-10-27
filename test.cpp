@@ -84,6 +84,8 @@ int main() {
         int x;
         int_obj(int x) : x(x) {}
         ~int_obj() {x = 0;}
+        bool operator== (int_obj const& that) const {return x == that.x;}
+        bool operator!= (int_obj const& that) const {return x != that.x;}
     };
 
     int_obj io {3};
@@ -93,9 +95,12 @@ int main() {
     }
 
     file_vector<int_obj> vector_test4("test4");
-    vector_test4.assign(vector_test3.cbegin(), vector_test3.cend());
-    //vector_test4 = vector_test3;
+    vector_test4 = vector_test3;
+    assert(vector_test3 == vector_test4);
+
+    file_vector<int_obj> vector_test5("test5", vector_test4);
 
     vector_test3.close();
     vector_test4.close();
+    vector_test5.close();
 }

@@ -152,7 +152,6 @@ public:
             }
         }
 
-
         values = static_cast<pointer>(mmap(nullptr
         , reserved * value_size
         , PROT_READ | PROT_WRITE
@@ -171,13 +170,52 @@ public:
         }
     }
 
+    file_vector(string const& name, file_vector const& from) : name(name) {
+        fd = open(name.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
+
+        if (fd == -1) {
+            throw runtime_error("Unable to open file for file_vector.");
+        }
+
+        reserved = from.capacity();
+        used = from.size();
+
+        if (ftruncate(fd, reserved * value_size) == -1) {
+            if (::close(fd) == -1) {
+                throw runtime_error("Unanble to close file after failing "
+                    "to reserve memory for file_vector."
+                );
+            }
+            throw runtime_error("Unable to eserve memory for file_vector.");
+        }
+
+        values = static_cast<pointer>(mmap(nullptr
+        , reserved * value_size
+        , PROT_READ | PROT_WRITE
+        , MAP_SHARED
+        , fd
+        , 0
+        ));
+
+        if (values == nullptr) {
+            if (::close(fd) == -1) {
+                throw runtime_error("Unanble close file after failing "
+                    "to mmap file for file_vector."
+                );
+            }
+            throw runtime_error("Unable to mmap file for file_vector.");
+        }
+
+        assign(from.cbegin(), from.cend());
+    }
+
     // value equality.
-    bool operator== (const_reference that) const {
-        if (used != that.used) {
+    bool operator== (file_vector const& that) const {
+        if (used != that.size()) {
             return false;
         }
-        const_iterator x = values;
-        const_iterator y = that.values;
+        const_iterator x = cbegin();
+        const_iterator y = that.cbegin();
         for (int i = 0; i < used; ++i) {
             if (*x++ != *y++) {
                 return false;
@@ -186,10 +224,10 @@ public:
         return true;
     }
 
-    /*reference operator= (const_reference src) {
+    file_vector& operator= (file_vector const& src) {
         assign(src.cbegin(), src.cend());
         return *this;
-    }*/
+    }
 
     //------------------------------------------------------------------------
     // Iterator
@@ -258,11 +296,11 @@ public:
             {return values[offset];}
     };
 
-    iterator begin() {
+    iterator begin() const {
         return iterator(values);
     }
 
-    iterator end() {
+    iterator end() const {
         return iterator(values + used);
     }
 
@@ -333,11 +371,11 @@ public:
             {return values[offset];}
     };
 
-    reverse_iterator rbegin() {
+    reverse_iterator rbegin() const {
         return reverse_iterator(values + used - 1);
     }
 
-    reverse_iterator rend() {
+    reverse_iterator rend() const {
         return reverse_iterator(values - 1);
     }
 
@@ -406,11 +444,11 @@ public:
             {return values[offset];}
     };
 
-    const_iterator cbegin() {
+    const_iterator cbegin() const {
         return const_iterator(values);
     }
 
-    const_iterator cend() {
+    const_iterator cend() const {
         return const_iterator(values + used);
     }
 
@@ -479,11 +517,11 @@ public:
             {return values[offset];}
     };
 
-    const_reverse_iterator crbegin() {
+    const_reverse_iterator crbegin() const {
         return const_reverse_iterator(values + used - 1);
     }
 
-    const_reverse_iterator crend() {
+    const_reverse_iterator crend() const {
         return const_reverse_iterator(values - 1);
     }
 
