@@ -35,9 +35,7 @@ template <typename T> class file_vector {
         static void single(pointer value, const_reference from) {
             *value = from;
         }
-        static void many(pointer first, pointer last) {
-            cout << "no constructor." << endl;
-        }
+        static void many(pointer first, pointer last) {}
         static void many(pointer first, pointer last, const_reference from) {
             while (first < last) {
                 *first++ = from;
@@ -57,13 +55,11 @@ template <typename T> class file_vector {
             while (first < last) {
                 new (static_cast<void*>(first++)) value_type();
             }
-            cout << "default constructed." << endl;
         }
         static void many(pointer first, pointer last, const_reference from) {
             while (first < last) {
                 new (static_cast<void*>(first++)) value_type(from);
             }
-            cout << "copy constructed." << endl;
         }
     };
     
@@ -72,9 +68,7 @@ template <typename T> class file_vector {
     template<typename U>
     struct destroy<U, typename enable_if<!is_class<U>::value || is_pod<U>::value>::type> {
         static void single(pointer value) {}
-        static void many(pointer first, pointer last) {
-            cout << "no destructor." << endl;
-        }
+        static void many(pointer first, pointer last) {}
     };
 
     template<typename U>
@@ -86,7 +80,6 @@ template <typename T> class file_vector {
             while (first < last) {
                 first++->~value_type();
             }
-            cout << "destroyed." << endl;
         }
     };
 
