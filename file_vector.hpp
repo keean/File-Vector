@@ -60,15 +60,10 @@ public:
         }
     }
         
-    file_vector(string const& name, size_type size = 0) : name(name) {
-        static size_type const page_size = getpagesize();
-
-        if (size == 0) {
-            size = page_size;
-        }
-        used = 0;
-        reserved = size;
-
+    file_vector(string const& name, size_type size = 1) : name(name)
+    , used(0)
+    , reserved((size > 0) ? size : 1)
+    {
         fd = open(name.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
 
         if (fd == -1) {
@@ -451,7 +446,7 @@ public:
 
     void resize(size_type const new_used) {
         if (new_used > reserved) {
-            reserve(reserved + reserved);
+            reserve(new_used);
         } 
         used = new_used;
     }
