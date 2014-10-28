@@ -658,9 +658,11 @@ public:
         difference_type const size = last - first;
 
         if (size < used) {
+            // destroy any excess and copy
             destroy<value_type>::many(values + size, values + used);
             copy(first, first + size, begin());
         } else {
+            // copy and construct extra
             copy(first, first + used, begin());
 
             if (size > used) {
@@ -686,11 +688,12 @@ public:
     void assign(size_type const size) {
         value_type const tmp;
 
-        // destroy any excess
         if (size < used) {
+            // destroy any excess and fill with default
             destroy<value_type>::many(values + size, values + used);
             fill(begin(), begin() + size, tmp);
         } else {
+            // fill with default and construct extra
             fill(begin(), begin() + used, tmp);
 
             if (size > used) {
@@ -706,11 +709,12 @@ public:
     }
 
     void assign(size_type const size, const_reference value) {
-        // destroy any excess
         if (size < used) {
+            // destroy any excess and fill with value
             destroy<value_type>::many(values + size, values + used);
             fill(begin(), begin() + size, value);
         } else {
+            // fill with value and construct extra
             fill(begin(), begin() + used, value);
 
             if (size > used) {
