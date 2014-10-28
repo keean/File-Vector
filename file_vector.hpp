@@ -20,7 +20,7 @@ template <typename T> class file_vector {
     using size_type = size_t;
 
     //------------------------------------------------------------------------
-    // Specialised contructors and destructors for values
+    // Specialised private contructors and destructors for values
     
     template<typename U, typename E = void> struct construct;
 
@@ -47,12 +47,12 @@ template <typename T> class file_vector {
             new (static_cast<void*>(value)) value_type(from);
         }
         static void many(pointer first, pointer last) {
-            while (first < last) {
+            while (first != last) {
                 new (static_cast<void*>(first++)) value_type();
             }
         }
         static void many(pointer first, pointer last, const_reference from) {
-            while (first < last) {
+            while (first != last) {
                 new (static_cast<void*>(first++)) value_type(from);
             }
         }
@@ -128,6 +128,7 @@ template <typename T> class file_vector {
     }
 
 public:
+
     //------------------------------------------------------------------------
     // Vectors are provided with value identity, so vectors are equal if their
     // contents are equal, and assignment copies contents from one vector to
@@ -191,7 +192,7 @@ public:
         }
     }
 
-    // value equality.
+    // Value equality.
     bool operator== (file_vector const& that) const {
         if (used != that.size()) {
             return false;
@@ -206,6 +207,7 @@ public:
         return true;
     }
 
+    // Copy contents.
     file_vector& operator= (file_vector const& src) {
         assign(src.cbegin(), src.cend());
         return *this;
@@ -558,28 +560,34 @@ public:
         }
     }
 
-    void resize(size_type const new_used) {
-        if (new_used > reserved) {
-            reserve(new_used);
-        } 
-        if (new_used < used) {
-            destroy<value_type>::many(new_used, used);
-        } else if (new_used > used) {
-            construct<value_type>::many(used, new_used);
+    // Default construct or destroy values as necessary 
+    void resize(size_type const size) {
+        if (size < used) {
+            destroy<value_type>::many(values + size, values + used);
+        } else if (size > used) {
+            if (size > reserved) {
+                reserve(size);
+            } 
+
+            construct<value_type>::many(values + used, values + size);
         }
-        used = new_used;
+
+        used = size;
     }
 
-    void resize(size_type const new_used, const_reference def) {
-        if (new_used > reserved) {
-            reserve(new_used);
-        } 
-        if (new_used < used) {
-            destroy<value_type>::many(new_used, used);
-        } else if (new_used > used) {
-            construct<value_type>::many(used, new_used, def);
+    // Copy construct or destroy values as necessary
+    void resize(size_type const size, const_reference value) {
+        if (size < used) {
+            destroy<value_type>::many(values + size, values + used);
+        } else if (size > used) {
+            if (size > reserved) {
+                reserve(size);
+            } 
+
+            construct<value_type>::many(values + used, values + size, value);
         }
-        used = new_used;
+
+        used = size;
     }
         
     bool empty() const {
@@ -593,6 +601,7 @@ public:
     //------------------------------------------------------------------------
     // Element Access
 
+    // Unchecked access
     const_reference operator[] (int const i) const {
         return values[i];
     }
@@ -601,6 +610,7 @@ public:
         return values[i];
     }
 
+    // Bounds checked access
     const_reference at(int const i) const {
         if (i < 0 || i >= used) {
             throw out_of_range("file_vector::at(int)");
@@ -615,6 +625,7 @@ public:
         return values[i];
     }
 
+    // Unchecked front and back
     const_reference front() const {
         return values[0];
     }
@@ -631,6 +642,7 @@ public:
         return values[used - 1];
     }
 
+    // Pointer to raw data.
     const_pointer data() const noexcept {
         return values;
     }
@@ -642,55 +654,75 @@ public:
     //------------------------------------------------------------------------
     // Modifiers
     
+    template <typename InputIterator> void assign(InputIterator first, InputIterator last) {
+        difference_type const size = last - first;
+
+        if (size < used) {
+            destroy<value_type>::many(values + size, values + used);
+            copy(first, first + size, begin());
+        } else {
+            copy(first, first + used, begin());
+
+            if (size > used) {
+                if (size > reserved) {
+                    reserve(size);
+                } 
+
+                const_iterator src = first + used;
+                pointer dst = values + used;
+                while (src != last) {
+                    construct<value_type>::single(dst++, *src++);
+                }
+            }
+        }
+
+        used = size;
+    }
+
     void assign(initializer_list<value_type> const& list) {
         assign(list.begin(), list.end());
     }
 
-    template <typename InputIterator> void assign(InputIterator first, InputIterator last) {
-        difference_type const size = last - first;
-        if (size > reserved) {
-            reserve(size);
-        } 
-        if (size > used) {
-            used = size;
-        }
-        copy(first, last, begin());
-    }
-
     void assign(size_type const size) {
-        if (size > reserved) {
-            reserve(size);
-        }
-        if (size > used) {
-            value_type tmp;
-            for (iterator i = begin(); i != end(); ++i) {
-                *i = tmp;
-            }
-            resize(size);
+        value_type const tmp;
+
+        // destroy any excess
+        if (size < used) {
+            destroy<value_type>::many(values + size, values + used);
+            fill(begin(), begin() + size, tmp);
         } else {
-            if (size < used) {
-                resize(size);
-            }
-            value_type tmp;
-            for (iterator i = begin(); i != end(); ++i) {
-                *i = tmp;
+            fill(begin(), begin() + used, tmp);
+
+            if (size > used) {
+                if (size > reserved) {
+                        reserve(size);
+                }
+
+                construct<value_type>::many(values + used, values + size);
             }
         }
+
+        used = size;
     }
 
     void assign(size_type const size, const_reference value) {
-        if (size > reserved) {
-            reserve(size);
-        } 
-        if (size > used) {
-            fill(begin(), end(), value);
-            resize(size, value);
+        // destroy any excess
+        if (size < used) {
+            destroy<value_type>::many(values + size, values + used);
+            fill(begin(), begin() + size, value);
         } else {
-            if (size < used) {
-                resize(size);
+            fill(begin(), begin() + used, value);
+
+            if (size > used) {
+                if (size > reserved) {
+                    reserve(size);
+                } 
+
+                construct<value_type>::many(values + used, values + size, value);
             }
-            fill(begin(), end(), value);
         }
+        
+        used = size;
     }
 
     void push_back(const_reference value) {
