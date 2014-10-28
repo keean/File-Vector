@@ -83,8 +83,8 @@ template <typename T> class file_vector {
         }
     };
 
-    void open() {
-        fd = ::open(name.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
+    void map_file_into_memory() {
+        fd = open(name.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
 
         if (fd == -1) {
             throw runtime_error("Unable to open file for file_vector.");
@@ -124,26 +124,26 @@ template <typename T> class file_vector {
 
 public:
     file_vector(string const& name) : name(name) {
-        open();
+        map_file_into_memory();
     }
 
     file_vector(string const& name, const int n) : name(name) {
-        open();
+        map_file_into_memory();
         assign(n);
     }
 
     file_vector(string const& name, const int n, const_reference value) : name(name) {
-        open();
+        map_file_into_memory();
         assign(n, value);
     }
 
     file_vector(string const& name, file_vector const& from) : name(name) {
-        open();
+        map_file_into_memory();
         assign(from.cbegin(), from.cend());
     }
 
     file_vector(string const& name, initializer_list<value_type> const& list) : name(name) {
-        open();
+        map_file_into_memory();
         assign(list);
     }
 
@@ -500,6 +500,13 @@ public:
         return reserved;
     }
 
+    //------------------------------------------------------------------------
+    // Reserve resizes the file with ftruncate, and then maps the file into
+    // memory at a new address. Because we are using shared mappings, this can
+    // re-use the page-cache already in memory. Finally it unmaps the old
+    // mapping leaving just the new 'resized' one, and points the class to the
+    // new mapping.
+    
     void reserve(size_type const new_reserved) {
         if (new_reserved != reserved) {
             if (ftruncate(fd, new_reserved * value_size) == -1) {
