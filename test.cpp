@@ -110,4 +110,6 @@ int main() {
 
     file_vector<int> vector_test7("test7", {9,8,7,6,5,4,3,2,1,0});
     vector_test7.close();
+
+    file_vector<int> a("test8", file_vector<int>("test6"));
 }

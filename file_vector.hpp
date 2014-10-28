@@ -19,14 +19,9 @@ template <typename T> class file_vector {
     using difference_type = ptrdiff_t;
     using size_type = size_t;
 
-    static size_type constexpr value_size = sizeof(T);
-
-    string const name;
-    size_type reserved;
-    size_type used;
-    int fd;
-    pointer values;
-
+    //------------------------------------------------------------------------
+    // Specialised contructors and destructors for values
+    
     template<typename U, typename E = void> struct construct;
 
     template<typename U>
@@ -83,6 +78,16 @@ template <typename T> class file_vector {
         }
     };
 
+    //------------------------------------------------------------------------
+    
+    static size_type constexpr value_size = sizeof(T);
+
+    string const name;
+    size_type reserved;
+    size_type used;
+    int fd;
+    pointer values;
+
     void map_file_into_memory() {
         fd = open(name.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
 
@@ -123,6 +128,14 @@ template <typename T> class file_vector {
     }
 
 public:
+    //------------------------------------------------------------------------
+    // Vectors are provided with value identity, so vectors are equal if their
+    // contents are equal, and assignment copies contents from one vector to
+    // another, but does not assign the file name, so a vector file can 
+    // be copied and opened like this:
+    //
+    // file_vector<T> dst_file("dst_file", file_vector<T>("src_file"));
+    
     file_vector(string const& name) : name(name) {
         map_file_into_memory();
     }
@@ -138,6 +151,11 @@ public:
     }
 
     file_vector(string const& name, file_vector const& from) : name(name) {
+        map_file_into_memory();
+        assign(from.cbegin(), from.cend());
+    }
+
+    file_vector(string const& name, file_vector&& from) : name(name) {
         map_file_into_memory();
         assign(from.cbegin(), from.cend());
     }
