@@ -729,9 +729,7 @@ public:
     }
 
     void push_back(const_reference value) {
-        if (used >= reserved) {
-            reserve(used);
-        }
+        reserve(used);
         construct<value_type>::single(values + (used++), value);
     }
 
