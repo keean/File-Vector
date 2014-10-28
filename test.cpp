@@ -112,4 +112,5 @@ int main() {
     vector_test7.close();
 
     file_vector<int> a("test8", file_vector<int>("test6"));
+    a.insert(a.cbegin(), 999); 
 }

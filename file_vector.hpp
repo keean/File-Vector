@@ -1,5 +1,6 @@
 #include <stdexcept>
 #include <type_traits>
+#include <algorithm>
 
 extern "C" {
     #include <unistd.h>
@@ -127,6 +128,47 @@ template <typename T> class file_vector {
         }
     }
 
+    //------------------------------------------------------------------------
+    // Resizes the file with ftruncate, and then maps the file into
+    // memory at a new address. Because we are using shared mappings, this can
+    // re-use the page-cache already in memory. Finally it unmaps the old
+    // mapping leaving just the new 'resized' one, and points the class to the
+    // new mapping.
+    
+    void resize_and_remap_file(size_type const size) {
+        assert(size != reserved);
+
+        if (ftruncate(fd, size * value_size) == -1) {
+            throw runtime_error("Unanble to extend memory for file_vector.");
+        }
+
+        pointer new_values = static_cast<pointer>(mmap(nullptr
+        , size * value_size
+        , PROT_READ | PROT_WRITE
+        , MAP_SHARED
+        , fd
+        , 0
+        ));
+
+        if (new_values == nullptr) {
+            throw runtime_error("Unable to mmap file for file_vector.");
+        }
+
+        if (munmap(values, reserved * value_size) == -1) {
+            if (munmap(new_values, size) == -1) {
+                throw runtime_error(
+                    "Unable to munmap file while "
+                    "handling failed munmap for file_vector."
+                );
+            };
+            throw runtime_error("Unable to munmap file for file_vector.");
+        }
+
+        values = new_values;
+        reserved = size;
+    }
+
+    // Default construct or destroy values as necessary 
 public:
 
     //------------------------------------------------------------------------
@@ -520,43 +562,15 @@ public:
         return reserved;
     }
 
-    //------------------------------------------------------------------------
-    // Reserve resizes the file with ftruncate, and then maps the file into
-    // memory at a new address. Because we are using shared mappings, this can
-    // re-use the page-cache already in memory. Finally it unmaps the old
-    // mapping leaving just the new 'resized' one, and points the class to the
-    // new mapping.
-    
-    void reserve(size_type const new_reserved) {
-        if (new_reserved != reserved) {
-            if (ftruncate(fd, new_reserved * value_size) == -1) {
-                throw runtime_error("Unanble to extend memory for file_vector.");
+    // Resize so that the capacity is at least 'size', using a doubling 
+    // algorithm. 
+    void reserve(size_type const size) {
+        if (size > reserved) {
+            size_type new_reserved = (reserved > 0) ? reserved : 1;
+            while (size > new_reserved) {
+                new_reserved += new_reserved;
             }
-
-            pointer new_values = static_cast<pointer>(mmap(nullptr
-            , new_reserved * value_size
-            , PROT_READ | PROT_WRITE
-            , MAP_SHARED
-            , fd
-            , 0
-            ));
-
-            if (new_values == nullptr) {
-                throw runtime_error("Unable to mmap file for file_vector.");
-            }
-
-            if (munmap(values, reserved * value_size) == -1) {
-                if (munmap(new_values, new_reserved) == -1) {
-                    throw runtime_error(
-                        "Unable to munmap file while "
-                        "handling failed munmap for file_vector."
-                    );
-                };
-                throw runtime_error("Unable to munmap file for file_vector.");
-            }
-
-            values = new_values;
-            reserved = new_reserved;
+            resize_and_remap_file(new_reserved);
         }
     }
 
@@ -565,10 +579,7 @@ public:
         if (size < used) {
             destroy<value_type>::many(values + size, values + used);
         } else if (size > used) {
-            if (size > reserved) {
-                reserve(size);
-            } 
-
+            reserve(size);
             construct<value_type>::many(values + used, values + size);
         }
 
@@ -580,10 +591,7 @@ public:
         if (size < used) {
             destroy<value_type>::many(values + size, values + used);
         } else if (size > used) {
-            if (size > reserved) {
-                reserve(size);
-            } 
-
+            reserve(size);
             construct<value_type>::many(values + used, values + size, value);
         }
 
@@ -595,7 +603,7 @@ public:
     }
 
     void shrink_to_fit() {
-        reserve(used);
+        resize_and_remap_file(used);
     }
 
     //------------------------------------------------------------------------
@@ -666,10 +674,7 @@ public:
             copy(first, first + used, begin());
 
             if (size > used) {
-                if (size > reserved) {
-                    reserve(size);
-                } 
-
+                reserve(size);
                 const_iterator src = first + used;
                 pointer dst = values + used;
                 while (src != last) {
@@ -697,10 +702,7 @@ public:
             fill(begin(), begin() + used, tmp);
 
             if (size > used) {
-                if (size > reserved) {
-                        reserve(size);
-                }
-
+                reserve(size);
                 construct<value_type>::many(values + used, values + size);
             }
         }
@@ -718,10 +720,7 @@ public:
             fill(begin(), begin() + used, value);
 
             if (size > used) {
-                if (size > reserved) {
-                    reserve(size);
-                } 
-
+                reserve(size);
                 construct<value_type>::many(values + used, values + size, value);
             }
         }
@@ -731,7 +730,7 @@ public:
 
     void push_back(const_reference value) {
         if (used >= reserved) {
-            reserve(used + used);
+            reserve(used);
         }
         construct<value_type>::single(values + (used++), value);
     }
@@ -745,9 +744,37 @@ public:
         used = 0;
     }
 
-    //------------------------------------------------------------------------
-    // TODO
+    // Single element
+    iterator insert(const_iterator position, value_type const& value) {
+        reserve(used + 1);
+        iterator dst = begin() + (position - cbegin());
+        copy_backward(dst, end(), end() + 1);
+        *dst = value;
+        ++used;
+        return dst;
+    }
 
+    // Move
+    iterator insert(const_iterator position, value_type&& value) {
+        reserve(used + 1);
+        iterator dst = begin() + (position - cbegin());
+        copy_backward(dst, end(), end() + 1);
+        swap(*dst, value);
+        ++used;
+        return dst;
+    }
+
+    // Fill
+    iterator insert(const_iterator position, size_type n, const value_type& value) {
+        reserve(used + n);
+        iterator dst = begin() + (position - cbegin());
+        copy_backward(dst, end(), end() + n);
+        fill(dst, n, value);
+        used += n;
+        return dst;
+    }
+
+    // TODO
     // insert
     // erase
     // swap
