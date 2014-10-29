@@ -937,8 +937,8 @@ public:
 
         difference_type const offset = position.values - values;
 
+        reserve(1);
         if (offset == used) {
-            reserve(1);
             construct<value_type>::single(values + used, forward<Args>(args)...);
         } else {
             construct<value_type>::single(values + used, values[used - 1]);
