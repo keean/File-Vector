@@ -41,10 +41,12 @@ template <typename T> class file_vector {
                 *first++ = from;
             }
         }
-        static void forward(pointer first, pointer last, pointer dst) {
+        template <typename InputIterator> 
+        static void forward(InputIterator first, InputIterator last, pointer dst) {
             copy(first, last, dst);
         }
-        static void backward(pointer first, pointer last, pointer dst) {
+        template <typename InputIterator> 
+        static void backward(InputIterator first, InputIterator last, pointer dst) {
             copy_backward(first, last, dst);
         }
     };
@@ -67,12 +69,14 @@ template <typename T> class file_vector {
                 new (static_cast<void*>(first++)) value_type(from);
             }
         }
-        static void forward(pointer first, pointer last, pointer dst) {
+        template <typename InputIterator> 
+        static void forward(InputIterator first, InputIterator last, pointer dst) {
             while (first < last) {
                 new (static_cast<void*>(dst++)) value_type(*first++);
             }
         }
-        static void backward(pointer first, pointer last, pointer dst) {
+        template <typename InputIterator> 
+        static void backward(InputIterator first, InputIterator last, pointer dst) {
             while (first < last) {
                 new (static_cast<void*>(--dst)) value_type(*(--last));
             }
@@ -162,7 +166,7 @@ template <typename T> class file_vector {
 
         // First, resize the file.
         if (ftruncate(fd, size * value_size) == -1) {
-            throw runtime_error("Unanble to extend memory for file_vector.");
+            throw runtime_error("Unanble to extend memory for file_vector resize.");
         }
 
         // Second, map the resized file to a new address, sharing the elements.
@@ -175,18 +179,20 @@ template <typename T> class file_vector {
         ));
 
         if (new_values == nullptr) {
-            throw runtime_error("Unable to mmap file for file_vector.");
+            throw runtime_error("Unable to mmap file for file_vector resize.");
         }
 
         // Third, unmap the file from the old address.
-        if (munmap(values, reserved * value_size) == -1) {
-            if (munmap(new_values, size) == -1) {
-                throw runtime_error(
-                    "Unable to munmap file while "
-                    "handling failed munmap for file_vector."
-                );
-            };
-            throw runtime_error("Unable to munmap file for file_vector.");
+        if (reserved > 0) {
+            if (munmap(values, reserved * value_size) == -1) {
+                if (munmap(new_values, size) == -1) {
+                    throw runtime_error(
+                        "Unable to munmap file while "
+                        "handling failed munmap for file_vector."
+                    );
+                };
+                throw runtime_error("Unable to munmap file for file_vector resize.");
+            }
         }
 
         // Finally, update the class.
@@ -290,7 +296,7 @@ public:
 
     //------------------------------------------------------------------------
     // Iterator
-    
+
     class iterator {
         friend file_vector;
         pointer values;
@@ -598,7 +604,7 @@ public:
     // Resize so that the capacity is at least 'size', using a doubling 
     // algorithm. 
     void reserve(size_type const size) {
-        if (size > reserved - used) {
+        if (used + size > reserved) {
             resize_and_remap_file(grow_to(used + size));
         }
     }
@@ -771,8 +777,46 @@ public:
         used = 0;
     }
 
+    // Range
+    template <typename I, typename = typename I::iterator_category>
+    iterator insert(const_iterator position, I first, I last) {
+
+        // cannot use position after reserve, must use offset.
+        difference_type const offset = position.values - values;
+        size_type const n = last - first;
+
+        if (n == 0) {
+            return begin() + offset;
+        } else if (n > used - offset) {
+            reserve(n);
+            construct<value_type>::backward(
+                values + offset,
+                values + used,
+                values + used + n
+            );
+            copy_n(first, used - offset, values + offset);
+            construct<value_type>::forward(
+                first + (used - offset),
+                last,
+                values + used
+            );
+        } else {
+            reserve(n);
+            construct<value_type>::backward(
+                values + used - n,
+                values + used,
+                values + used + n
+            );
+            copy_backward(values + offset, values + used - n, values + used);
+            copy_n(first, n, values + offset);
+        }
+
+        used += n;
+        return begin() + offset;
+    }
+
     // Fill
-    iterator insert(const_iterator position, size_type n, const value_type& value) {
+    iterator insert(const_iterator position, size_type n, value_type const& value) {
 
         // cannot use position after reserve, must use offset.
         difference_type const offset = position.values - values;
@@ -812,24 +856,10 @@ public:
         return insert(position, 1, value);
     }
 
-    /*
-    // Range
-    template <typename InputIterator>
-    iterator insert(const_iterator position, InputIterator first, InputIterator last) {
-        difference_type const size = last - first;
-        reserve(size);
-        iterator dst = begin() + (position - cbegin());
-        copy_backward(dst, end(), end() + size);
-        copy(first, last, dst);
-        used += size;
-        return dst;
-    }
-
     // Initialiser List
     iterator insert(const_iterator position, initializer_list<value_type> list) {
         return insert(position, list.begin(), list.end());
     }
-    */
 
     // TODO
     // erase

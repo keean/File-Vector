@@ -109,12 +109,13 @@ int main() {
     vector_test6.assign({1,2,3,4,5,6,7,8,9});
     vector_test6.close();
 
-    file_vector<int> vector_test7("test7", {9,8,7,6,5,4,3,2,1,0});
-    vector_test7.close();
+    file_vector<int> b("test7", {9,8,7,6,5,4,3,2,1,0});
 
     file_vector<int> a("test8", file_vector<int>("test6"));
     a.insert(a.cbegin(), 999); 
     a.insert(a.cbegin(), 2, 999); 
     a.insert(a.cbegin(), a.size() + 2, 999); 
 
+    a.insert(a.cbegin() + 2, b.cbegin() + 1, b.cend() - 1);
+    a.insert(a.cend() - 3, b.cbegin() + 1, b.cend() - 1);
 }
