@@ -59,6 +59,10 @@ template <typename T> class file_vector {
         static void single(pointer value, const_reference from) {
             new (static_cast<void*>(value)) value_type(from);
         }
+        template <typename... Args>
+        static void single(pointer value, Args&&... args) {
+            new (static_cast<void*>(value)) value_type(std::forward<Args>(args)...);
+        }
         static void many(pointer first, pointer last) {
             while (first != last) {
                 new (static_cast<void*>(first++)) value_type();
@@ -915,15 +919,27 @@ public:
 
     //------------------------------------------------------------------------
 
-    void swap(file_vector& x) {
-        vector<value_type> const tmp (x);
-
-        x = *this;
+    void swap(file_vector& that) {
+        vector<value_type> const tmp(that);
+        that = *this;
         *this = tmp;
     }
 
+    //------------------------------------------------------------------------
+    
+    template <typename... Args> void emplace_back(Args&&... args) {
+        reserve(1);
+        construct<value_type>::single(values + (used++), forward<Args>(args)...);
+    }
+        
+
     // TODO
     // emplace
-    // emplace_back
 };
+
+template <typename T> void swap (file_vector<T>& a, file_vector<T>& b) {
+    vector<T> tmp(a);
+    a = b;
+    b = tmp;
+}
 

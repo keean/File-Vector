@@ -82,7 +82,7 @@ int main() {
 
     struct int_obj {
         int x;
-        int_obj(int x) : x(x) {}
+        explicit int_obj(int x) : x(x) {}
         ~int_obj() {x = 0;}
         bool operator== (int_obj const& that) const {return x == that.x;}
         bool operator!= (int_obj const& that) const {return x != that.x;}
@@ -90,16 +90,36 @@ int main() {
 
     int_obj io {3};
     file_vector<int_obj> vector_test3("test3");
+    vector_test3.clear();
+
     for (int i = 0; i < page_size; ++i) {
         vector_test3.push_back(io);   
     }
 
+    for (int i = 0; i < vector_test3.size(); ++i) {
+        assert(vector_test3[i] == io);
+    }
+
     file_vector<int_obj> vector_test4("test4");
     vector_test4 = vector_test3;
+
+    for (int i = 0; i < vector_test4.size(); ++i) {
+        assert(vector_test3[i] == io);
+    }
+
     assert(vector_test3 == vector_test4);
+
     vector_test4.insert(vector_test4.cend(), int_obj(999));
 
+    for (int i = 0; i < vector_test4.size() - 1; ++i) {
+        assert(vector_test4[i] == io);
+    }
+    assert(vector_test4.back() == int_obj(999));
+
     file_vector<int_obj> vector_test5("test5", vector_test4);
+
+    vector_test5.emplace_back(888);
+    assert(vector_test5.back() == int_obj(888));
 
     vector_test3.close();
     vector_test4.close();
@@ -169,9 +189,10 @@ int main() {
         7, 8, 9
     }));
 
-    //a.close();
-
     a.swap(b);
+    swap(a, b);
+    b.swap(a);
+
     assert(b == vector<int>({
         8, 7, 6, 5, 4, 3, 2, 1,
         1, 2, 3, 4, 5, 6,
