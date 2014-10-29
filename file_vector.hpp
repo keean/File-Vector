@@ -853,7 +853,7 @@ public:
         difference_type const offset = position.values - values;
         size_type const n = last - first;
 
-        if (n == 0) {
+        if (n <= 0) {
             return begin() + offset;
         } else if (n > used - offset) {
             // inserted values spill into unininitialised memory
@@ -932,9 +932,23 @@ public:
         construct<value_type>::single(values + (used++), forward<Args>(args)...);
     }
         
+    template <typename... Args> iterator emplace(const_iterator position, Args&&... args) {
+        assert(values <= position.values && position.values < values + used);
 
-    // TODO
-    // emplace
+        difference_type const offset = position.values - values;
+
+        if (offset == used) {
+            reserve(1);
+            construct<value_type>::single(values + used, forward<Args>(args)...);
+        } else {
+            construct<value_type>::single(values + used, values[used - 1]);
+            copy_backward(values + offset, values + used - 1, values + used); 
+            values[offset] = value_type(forward<Args>(args)...);
+        }
+
+        ++used;
+        return begin() + offset;
+    }
 };
 
 template <typename T> void swap (file_vector<T>& a, file_vector<T>& b) {

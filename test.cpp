@@ -120,6 +120,17 @@ int main() {
 
     vector_test5.emplace_back(888);
     assert(vector_test5.back() == int_obj(888));
+    
+    vector_test5.emplace(vector_test5.cbegin() + 1, int_obj(777));
+
+    auto i = vector_test5.cbegin();
+    assert(*i++ == io);
+    assert(*i++ == int_obj(777));
+    for (int x = 2; x < vector_test5.size() - 2; ++x) {
+        assert(*i++ == io);
+    }
+    assert(*i++ == int_obj(999));
+    assert(*i++ == int_obj(888));
 
     vector_test3.close();
     vector_test4.close();
