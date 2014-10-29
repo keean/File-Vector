@@ -247,6 +247,11 @@ public:
         assign(list);
     }
 
+    file_vector(string const& name, vector<value_type> const& src) : name(name) {
+        map_file_into_memory();
+        assign(src.cbegin(), src.cend());
+    }
+
     virtual ~file_vector() noexcept {
         if (values != nullptr) {
             munmap(values, reserved);
@@ -275,23 +280,28 @@ public:
 
     // Value equality.
     bool operator== (file_vector const& that) const {
-        if (used != that.size()) {
-            return false;
-        }
-        const_iterator x = cbegin();
-        const_iterator y = that.cbegin();
-        for (int i = 0; i < used; ++i) {
-            if (*x++ != *y++) {
-                return false;
-            }
-        }
-        return true;
+        return (used == that.size()) && range_same(that.cbegin(), that.cend(), cbegin()); 
+    }
+
+    bool operator== (vector<value_type> const& that) const {
+        return (used == that.size()) && range_same(that.cbegin(), that.cend(), cbegin());
     }
 
     // Copy contents.
     file_vector& operator= (file_vector const& src) {
         assign(src.cbegin(), src.cend());
         return *this;
+    }
+
+    file_vector& operator= (vector<T> const& src) {
+        assign(src.cbegin(), src.cend());
+        return *this;
+    }
+
+    operator vector<T>() {
+        vector<T> dst;
+        dst.assign(begin(), end());
+        return dst;
     }
 
     //------------------------------------------------------------------------
@@ -591,6 +601,17 @@ public:
     }
 
     //------------------------------------------------------------------------
+    
+    template <typename I> bool range_same(I first, I last, const_iterator with) const {
+        while (first != last) {
+            if (*first++ != *with++) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    //------------------------------------------------------------------------
     // Capacity
     
     size_type size() const {
@@ -759,6 +780,8 @@ public:
         used = size;
     }
 
+    //------------------------------------------------------------------------
+
     void push_back(const_reference value) {
         reserve(1);
         construct<value_type>::single(values + (used++), value);
@@ -772,6 +795,8 @@ public:
         destroy<value_type>::many(values, values + used);
         used = 0;
     }
+
+    //------------------------------------------------------------------------
 
     // Fill
     iterator insert(const_iterator position, size_type n, value_type const& value) {
@@ -863,6 +888,8 @@ public:
 
     // TODO Insert Move?
 
+    //------------------------------------------------------------------------
+  
     iterator erase(const_iterator position) {
         assert(values <= position.values && position.values < values + used);
 
@@ -886,8 +913,16 @@ public:
         return begin() + offset;
     }
 
+    //------------------------------------------------------------------------
+
+    void swap(file_vector& x) {
+        vector<value_type> const tmp (x);
+
+        x = *this;
+        *this = tmp;
+    }
+
     // TODO
-    // swap
     // emplace
     // emplace_back
 };

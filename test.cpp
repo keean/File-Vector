@@ -113,19 +113,19 @@ int main() {
     file_vector<int> a("test8", file_vector<int>("test6"));
 
     a.insert(a.cbegin(), 999); 
-    assert(a == file_vector<int>("test9", {999, 1, 2, 3, 4, 5, 6, 7, 8, 9}));
+    assert(a == vector<int>({999, 1, 2, 3, 4, 5, 6, 7, 8, 9}));
 
     a.insert(a.cbegin(), 2, 999); 
-    assert(a == file_vector<int>("test9", {999, 999, 999, 1, 2, 3, 4, 5, 6, 7, 8, 9}));
+    assert(a == vector<int>({999, 999, 999, 1, 2, 3, 4, 5, 6, 7, 8, 9}));
 
     a.insert(a.cbegin(), a.size() + 2, 999); 
-    assert(a == file_vector<int>("test9", {
+    assert(a == vector<int>({
         999, 999, 999, 999, 999, 999, 999, 999, 999, 999, 999, 999, 999, 999,
         999, 999, 999, 1, 2, 3, 4, 5, 6, 7, 8, 9
     }));
 
     a.insert(a.cbegin() + 2, b.cbegin() + 1, b.cend() - 1);
-    assert(a == file_vector<int>("test9", {
+    assert(a == vector<int>({
         999, 999, 8, 7, 6, 5, 4, 3, 2, 1, 
         999, 999, 999, 999, 999, 999, 999, 999, 999, 999, 999, 999,
         999, 999, 999, 1, 2, 3, 4, 5, 6, 7, 8, 9
@@ -133,7 +133,7 @@ int main() {
 
 
     a.insert(a.cend() - 3, b.cbegin() + 1, b.cend() - 1);
-    assert(a == file_vector<int>("test9", {
+    assert(a == vector<int>({
         999, 999,
         8, 7, 6, 5, 4, 3, 2, 1, 
         999, 999, 999, 999, 999, 999, 999, 999, 999, 999, 999, 999,
@@ -143,7 +143,7 @@ int main() {
     }));
 
     a.erase(a.cbegin());
-    assert(a == file_vector<int>("test9", {
+    assert(a == vector<int>({
         999,
         8, 7, 6, 5, 4, 3, 2, 1, 
         999, 999, 999, 999, 999, 999, 999, 999, 999, 999, 999, 999,
@@ -153,7 +153,7 @@ int main() {
     }));
 
     a.erase(a.cbegin());
-    assert(a == file_vector<int>("test9", {
+    assert(a == vector<int>({
         8, 7, 6, 5, 4, 3, 2, 1, 
         999, 999, 999, 999, 999, 999, 999, 999, 999, 999, 999, 999,
         999, 999, 999, 1, 2, 3, 4, 5, 6,
@@ -162,10 +162,21 @@ int main() {
     }));
 
     a.erase(a.cbegin() + 8, a.cbegin() + 23);
-    assert(a == file_vector<int>("test9", {
+    assert(a == vector<int>({
         8, 7, 6, 5, 4, 3, 2, 1, 
         1, 2, 3, 4, 5, 6,
         8, 7, 6, 5, 4, 3, 2, 1,
         7, 8, 9
     }));
+
+    //a.close();
+
+    a.swap(b);
+    assert(b == vector<int>({
+        8, 7, 6, 5, 4, 3, 2, 1,
+        1, 2, 3, 4, 5, 6,
+        8, 7, 6, 5, 4, 3, 2, 1,
+        7, 8, 9
+    }));
+    assert(a == vector<int>({9,8,7,6,5,4,3,2,1,0}));
 }
