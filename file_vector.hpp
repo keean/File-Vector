@@ -136,7 +136,9 @@ template <typename T> class file_vector {
     // new mapping.
     
     void resize_and_remap_file(size_type const size) {
-        assert(size != reserved);
+        if (size == reserved) {
+            return;
+        }
 
         if (ftruncate(fd, size * value_size) == -1) {
             throw runtime_error("Unanble to extend memory for file_vector.");
@@ -168,7 +170,14 @@ template <typename T> class file_vector {
         reserved = size;
     }
 
-    // Default construct or destroy values as necessary 
+    size_type grow_to(size_type const size) {
+        size_type capacity = reserved * 1.5;
+        if (capacity < size) {
+            capacity = size;
+        }
+        return capacity;
+    }
+
 public:
 
     //------------------------------------------------------------------------
@@ -565,12 +574,8 @@ public:
     // Resize so that the capacity is at least 'size', using a doubling 
     // algorithm. 
     void reserve(size_type const size) {
-        if (size > reserved) {
-            size_type new_reserved = (reserved > 0) ? reserved : 1;
-            while (size > new_reserved) {
-                new_reserved += new_reserved;
-            }
-            resize_and_remap_file(new_reserved);
+        if (size > reserved - used) {
+            resize_and_remap_file(grow_to(used + size));
         }
     }
 
@@ -591,7 +596,7 @@ public:
         if (size < used) {
             destroy<value_type>::many(values + size, values + used);
         } else if (size > used) {
-            reserve(size);
+            reserve(size - used);
             construct<value_type>::many(values + used, values + size, value);
         }
 
@@ -674,7 +679,7 @@ public:
             copy(first, first + used, begin());
 
             if (size > used) {
-                reserve(size);
+                reserve(size - used);
                 const_iterator src = first + used;
                 pointer dst = values + used;
                 while (src != last) {
@@ -702,7 +707,7 @@ public:
             fill(begin(), begin() + used, tmp);
 
             if (size > used) {
-                reserve(size);
+                reserve(size - used);
                 construct<value_type>::many(values + used, values + size);
             }
         }
@@ -720,7 +725,7 @@ public:
             fill(begin(), begin() + used, value);
 
             if (size > used) {
-                reserve(size);
+                reserve(size - used);
                 construct<value_type>::many(values + used, values + size, value);
             }
         }
@@ -729,7 +734,7 @@ public:
     }
 
     void push_back(const_reference value) {
-        reserve(used);
+        reserve(1);
         construct<value_type>::single(values + (used++), value);
     }
 
@@ -744,19 +749,35 @@ public:
 
     // Single element
     iterator insert(const_iterator position, value_type const& value) {
-        reserve(used + 1);
+        reserve(1);
         iterator dst = begin() + (position - cbegin());
-        copy_backward(dst, end(), end() + 1);
-        *dst = value;
+        difference_type size = end() - dst;
+        if (size > 0) {
+            construct<value_type>::single(values + used, values[used - 1]);
+            if (size > 1) {
+                copy_backward(dst, end() - 1, end());
+            }
+        }
+        if (dst >= end()) {
+            construct<value_type>::single(values + used, value);
+        } else {
+            *dst = value;
+        }
         ++used;
         return dst;
     }
 
     // Move
     iterator insert(const_iterator position, value_type&& value) {
-        reserve(used + 1);
+        reserve(1);
         iterator dst = begin() + (position - cbegin());
-        copy_backward(dst, end(), end() + 1);
+        difference_type size = end() - dst;
+        if (size > 0) {
+            construct<value_type>::single(values + used, values[used - 1]);
+            if (size > 1) {
+                copy_backward(dst, end(), end() + 1);
+            }
+        }
         swap(*dst, value);
         ++used;
         return dst;
@@ -764,7 +785,7 @@ public:
 
     // Fill
     iterator insert(const_iterator position, size_type n, const value_type& value) {
-        reserve(used + n);
+        reserve(n);
         iterator dst = begin() + (position - cbegin());
         copy_backward(dst, end(), end() + n);
         fill(dst, n, value);
@@ -772,8 +793,24 @@ public:
         return dst;
     }
 
+    // Range
+    template <typename InputIterator>
+    iterator insert(const_iterator position, InputIterator first, InputIterator last) {
+        difference_type const size = last - first;
+        reserve(size);
+        iterator dst = begin() + (position - cbegin());
+        copy_backward(dst, end(), end() + size);
+        copy(first, last, dst);
+        used += size;
+        return dst;
+    }
+
+    // Initialiser List
+    iterator insert(const_iterator position, initializer_list<value_type> list) {
+        return insert(position, list.begin(), list.end());
+    }
+
     // TODO
-    // insert
     // erase
     // swap
     // emplace
