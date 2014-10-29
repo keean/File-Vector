@@ -861,8 +861,32 @@ public:
         return insert(position, list.begin(), list.end());
     }
 
+    // TODO Insert Move?
+
+    iterator erase(const_iterator position) {
+        assert(values <= position.values && position.values < values + used);
+
+        difference_type const offset = position.values - values;
+         
+        destroy<value_type>::single(values + offset);
+        copy(values + offset + 1, values + used, values + offset);
+        --used;
+        return begin() + offset; 
+    }
+
+    iterator erase(const_iterator first, const_iterator last) {
+        assert(values <= first.values && first.values < values + used);
+
+        difference_type const offset = first.values - values;
+        size_type const n = last - first;
+
+        destroy<value_type>::many(values + offset, values + offset + n);
+        copy(values + offset + n, values + used, values + offset);
+        used -= n;
+        return begin() + offset;
+    }
+
     // TODO
-    // erase
     // swap
     // emplace
     // emplace_back

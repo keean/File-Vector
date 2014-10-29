@@ -83,7 +83,7 @@ int main() {
     struct int_obj {
         int x;
         int_obj(int x) : x(x) {}
-        //~int_obj() {x = 0;}
+        ~int_obj() {x = 0;}
         bool operator== (int_obj const& that) const {return x == that.x;}
         bool operator!= (int_obj const& that) const {return x != that.x;}
     };
@@ -110,12 +110,62 @@ int main() {
     vector_test6.close();
 
     file_vector<int> b("test7", {9,8,7,6,5,4,3,2,1,0});
-
     file_vector<int> a("test8", file_vector<int>("test6"));
+
     a.insert(a.cbegin(), 999); 
+    assert(a == file_vector<int>("test9", {999, 1, 2, 3, 4, 5, 6, 7, 8, 9}));
+
     a.insert(a.cbegin(), 2, 999); 
+    assert(a == file_vector<int>("test9", {999, 999, 999, 1, 2, 3, 4, 5, 6, 7, 8, 9}));
+
     a.insert(a.cbegin(), a.size() + 2, 999); 
+    assert(a == file_vector<int>("test9", {
+        999, 999, 999, 999, 999, 999, 999, 999, 999, 999, 999, 999, 999, 999,
+        999, 999, 999, 1, 2, 3, 4, 5, 6, 7, 8, 9
+    }));
 
     a.insert(a.cbegin() + 2, b.cbegin() + 1, b.cend() - 1);
+    assert(a == file_vector<int>("test9", {
+        999, 999, 8, 7, 6, 5, 4, 3, 2, 1, 
+        999, 999, 999, 999, 999, 999, 999, 999, 999, 999, 999, 999,
+        999, 999, 999, 1, 2, 3, 4, 5, 6, 7, 8, 9
+    }));
+
+
     a.insert(a.cend() - 3, b.cbegin() + 1, b.cend() - 1);
+    assert(a == file_vector<int>("test9", {
+        999, 999,
+        8, 7, 6, 5, 4, 3, 2, 1, 
+        999, 999, 999, 999, 999, 999, 999, 999, 999, 999, 999, 999,
+        999, 999, 999, 1, 2, 3, 4, 5, 6,
+        8, 7, 6, 5, 4, 3, 2, 1,
+        7, 8, 9
+    }));
+
+    a.erase(a.cbegin());
+    assert(a == file_vector<int>("test9", {
+        999,
+        8, 7, 6, 5, 4, 3, 2, 1, 
+        999, 999, 999, 999, 999, 999, 999, 999, 999, 999, 999, 999,
+        999, 999, 999, 1, 2, 3, 4, 5, 6,
+        8, 7, 6, 5, 4, 3, 2, 1,
+        7, 8, 9
+    }));
+
+    a.erase(a.cbegin());
+    assert(a == file_vector<int>("test9", {
+        8, 7, 6, 5, 4, 3, 2, 1, 
+        999, 999, 999, 999, 999, 999, 999, 999, 999, 999, 999, 999,
+        999, 999, 999, 1, 2, 3, 4, 5, 6,
+        8, 7, 6, 5, 4, 3, 2, 1,
+        7, 8, 9
+    }));
+
+    a.erase(a.cbegin() + 8, a.cbegin() + 23);
+    assert(a == file_vector<int>("test9", {
+        8, 7, 6, 5, 4, 3, 2, 1, 
+        1, 2, 3, 4, 5, 6,
+        8, 7, 6, 5, 4, 3, 2, 1,
+        7, 8, 9
+    }));
 }
