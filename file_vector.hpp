@@ -710,11 +710,7 @@ public:
 
             if (size > used) {
                 reserve(size - used);
-                const_iterator src = first + used;
-                pointer dst = values + used;
-                while (src != last) {
-                    construct<value_type>::single(dst++, *src++);
-                }
+                construct<value_type>::forward(first + used, last, values + used);
             }
         }
 
@@ -777,44 +773,6 @@ public:
         used = 0;
     }
 
-    // Range
-    template <typename I, typename = typename I::iterator_category>
-    iterator insert(const_iterator position, I first, I last) {
-
-        // cannot use position after reserve, must use offset.
-        difference_type const offset = position.values - values;
-        size_type const n = last - first;
-
-        if (n == 0) {
-            return begin() + offset;
-        } else if (n > used - offset) {
-            reserve(n);
-            construct<value_type>::backward(
-                values + offset,
-                values + used,
-                values + used + n
-            );
-            copy_n(first, used - offset, values + offset);
-            construct<value_type>::forward(
-                first + (used - offset),
-                last,
-                values + used
-            );
-        } else {
-            reserve(n);
-            construct<value_type>::backward(
-                values + used - n,
-                values + used,
-                values + used + n
-            );
-            copy_backward(values + offset, values + used - n, values + used);
-            copy_n(first, n, values + offset);
-        }
-
-        used += n;
-        return begin() + offset;
-    }
-
     // Fill
     iterator insert(const_iterator position, size_type n, value_type const& value) {
 
@@ -824,6 +782,7 @@ public:
         if (n == 0) {
             return begin() + offset;
         } else if (n > used - offset) {
+            // inserted values spill into unininitialised memory
             reserve(n);
             construct<value_type>::backward(
                 values + offset,
@@ -837,6 +796,7 @@ public:
                 value
             );
         } else {
+            // copied values spill into uninitialised memory
             reserve(n);
             construct<value_type>::backward(
                 values + used - n,
@@ -854,6 +814,46 @@ public:
     // Single element 
     iterator insert(const_iterator position, value_type const& value) {
         return insert(position, 1, value);
+    }
+
+    // Range
+    template <typename I, typename = typename I::iterator_category>
+    iterator insert(const_iterator position, I first, I last) {
+
+        // cannot use position after reserve, must use offset.
+        difference_type const offset = position.values - values;
+        size_type const n = last - first;
+
+        if (n == 0) {
+            return begin() + offset;
+        } else if (n > used - offset) {
+            // inserted values spill into unininitialised memory
+            reserve(n);
+            construct<value_type>::backward(
+                values + offset,
+                values + used,
+                values + used + n
+            );
+            copy_n(first, used - offset, values + offset);
+            construct<value_type>::forward(
+                first + (used - offset),
+                last,
+                values + used
+            );
+        } else {
+            // copied values spill into uninitialised memory
+            reserve(n);
+            construct<value_type>::backward(
+                values + used - n,
+                values + used,
+                values + used + n
+            );
+            copy_backward(values + offset, values + used - n, values + used);
+            copy_n(first, n, values + offset);
+        }
+
+        used += n;
+        return begin() + offset;
     }
 
     // Initialiser List
