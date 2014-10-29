@@ -83,7 +83,7 @@ int main() {
     struct int_obj {
         int x;
         int_obj(int x) : x(x) {}
-        ~int_obj() {x = 0;}
+        //~int_obj() {x = 0;}
         bool operator== (int_obj const& that) const {return x == that.x;}
         bool operator!= (int_obj const& that) const {return x != that.x;}
     };
@@ -97,6 +97,7 @@ int main() {
     file_vector<int_obj> vector_test4("test4");
     vector_test4 = vector_test3;
     assert(vector_test3 == vector_test4);
+    vector_test4.insert(vector_test4.cend(), int_obj(999));
 
     file_vector<int_obj> vector_test5("test5", vector_test4);
 
@@ -113,4 +114,7 @@ int main() {
 
     file_vector<int> a("test8", file_vector<int>("test6"));
     a.insert(a.cbegin(), 999); 
+    a.insert(a.cbegin(), 2, 999); 
+    a.insert(a.cbegin(), a.size() + 2, 999); 
+
 }

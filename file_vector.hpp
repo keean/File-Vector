@@ -11,6 +11,10 @@ extern "C" {
 
 using namespace std;
 
+// Use should be limited to data that does not contain pointers.
+// Unfortunately there is no way to express this constraint using
+// type_traits that could enforce this rule.
+
 template <typename T> class file_vector {
     using value_type = T;
     using reference = T&;
@@ -37,6 +41,12 @@ template <typename T> class file_vector {
                 *first++ = from;
             }
         }
+        static void forward(pointer first, pointer last, pointer dst) {
+            copy(first, last, dst);
+        }
+        static void backward(pointer first, pointer last, pointer dst) {
+            copy_backward(first, last, dst);
+        }
     };
 
     template<typename U>
@@ -53,8 +63,18 @@ template <typename T> class file_vector {
             }
         }
         static void many(pointer first, pointer last, const_reference from) {
-            while (first != last) {
+            while (first < last) {
                 new (static_cast<void*>(first++)) value_type(from);
+            }
+        }
+        static void forward(pointer first, pointer last, pointer dst) {
+            while (first < last) {
+                new (static_cast<void*>(dst++)) value_type(*first++);
+            }
+        }
+        static void backward(pointer first, pointer last, pointer dst) {
+            while (first < last) {
+                new (static_cast<void*>(--dst)) value_type(*(--last));
             }
         }
     };
@@ -140,10 +160,12 @@ template <typename T> class file_vector {
             return;
         }
 
+        // First, resize the file.
         if (ftruncate(fd, size * value_size) == -1) {
             throw runtime_error("Unanble to extend memory for file_vector.");
         }
 
+        // Second, map the resized file to a new address, sharing the elements.
         pointer new_values = static_cast<pointer>(mmap(nullptr
         , size * value_size
         , PROT_READ | PROT_WRITE
@@ -156,6 +178,7 @@ template <typename T> class file_vector {
             throw runtime_error("Unable to mmap file for file_vector.");
         }
 
+        // Third, unmap the file from the old address.
         if (munmap(values, reserved * value_size) == -1) {
             if (munmap(new_values, size) == -1) {
                 throw runtime_error(
@@ -166,6 +189,7 @@ template <typename T> class file_vector {
             throw runtime_error("Unable to munmap file for file_vector.");
         }
 
+        // Finally, update the class.
         values = new_values;
         reserved = size;
     }
@@ -747,52 +771,48 @@ public:
         used = 0;
     }
 
-    // Single element
-    iterator insert(const_iterator position, value_type const& value) {
-        reserve(1);
-        iterator dst = begin() + (position - cbegin());
-        difference_type size = end() - dst;
-        if (size > 0) {
-            construct<value_type>::single(values + used, values[used - 1]);
-            if (size > 1) {
-                copy_backward(dst, end() - 1, end());
-            }
-        }
-        if (dst >= end()) {
-            construct<value_type>::single(values + used, value);
-        } else {
-            *dst = value;
-        }
-        ++used;
-        return dst;
-    }
-
-    // Move
-    iterator insert(const_iterator position, value_type&& value) {
-        reserve(1);
-        iterator dst = begin() + (position - cbegin());
-        difference_type size = end() - dst;
-        if (size > 0) {
-            construct<value_type>::single(values + used, values[used - 1]);
-            if (size > 1) {
-                copy_backward(dst, end(), end() + 1);
-            }
-        }
-        swap(*dst, value);
-        ++used;
-        return dst;
-    }
-
     // Fill
     iterator insert(const_iterator position, size_type n, const value_type& value) {
-        reserve(n);
-        iterator dst = begin() + (position - cbegin());
-        copy_backward(dst, end(), end() + n);
-        fill(dst, n, value);
+
+        // cannot use position after reserve, must use offset.
+        difference_type const offset = position.values - values;
+
+        if (n == 0) {
+            return begin() + offset;
+        } else if (n > used - offset) {
+            reserve(n);
+            construct<value_type>::backward(
+                values + offset,
+                values + used,
+                values + used + n
+            );
+            fill_n(values + offset, used - offset, value);
+            construct<value_type>::many(
+                values + used,
+                values + offset + n,
+                value
+            );
+        } else {
+            reserve(n);
+            construct<value_type>::backward(
+                values + used - n,
+                values + used,
+                values + used + n
+            );
+            copy_backward(values + offset, values + used - n, values + used);
+            fill_n(values + offset, n, value);
+        }
+
         used += n;
-        return dst;
+        return begin() + offset;
     }
 
+    // Single element 
+    iterator insert(const_iterator position, value_type const& value) {
+        return insert(position, 1, value);
+    }
+
+    /*
     // Range
     template <typename InputIterator>
     iterator insert(const_iterator position, InputIterator first, InputIterator last) {
@@ -809,6 +829,7 @@ public:
     iterator insert(const_iterator position, initializer_list<value_type> list) {
         return insert(position, list.begin(), list.end());
     }
+    */
 
     // TODO
     // erase
