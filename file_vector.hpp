@@ -139,21 +139,24 @@ template <typename T> class file_vector {
         used = size / value_size;
         reserved = size / value_size;
 
-        values = static_cast<pointer>(mmap(nullptr
-        , reserved * value_size
-        , PROT_READ | PROT_WRITE
-        , MAP_SHARED
-        , fd
-        , 0
-        ));
+        // Posix does not allow mmap of zero size.
+        if (reserved > 0) {
+            values = static_cast<pointer>(mmap(nullptr
+            , reserved * value_size
+            , PROT_READ | PROT_WRITE
+            , MAP_SHARED
+            , fd
+            , 0
+            ));
 
-        if (values == nullptr) {
-            if (::close(fd) == -1) {
-                throw runtime_error("Unanble close file after failing "
-                    "to mmap file for file_vector."
-                );
+            if (values == nullptr) {
+                if (::close(fd) == -1) {
+                    throw runtime_error("Unanble close file after failing "
+                        "to mmap file for file_vector."
+                    );
+                }
+                throw runtime_error("Unable to mmap file for file_vector.");
             }
-            throw runtime_error("Unable to mmap file for file_vector.");
         }
     }
 
@@ -175,22 +178,25 @@ template <typename T> class file_vector {
         }
 
         // Second, map the resized file to a new address, sharing the elements.
-        pointer new_values = static_cast<pointer>(mmap(nullptr
-        , size * value_size
-        , PROT_READ | PROT_WRITE
-        , MAP_SHARED
-        , fd
-        , 0
-        ));
+        pointer new_values = nullptr;
+        if (size > 0) {
+            new_values = static_cast<pointer>(mmap(nullptr
+            , size * value_size
+            , PROT_READ | PROT_WRITE
+            , MAP_SHARED
+            , fd
+            , 0
+            ));
 
-        if (new_values == nullptr) {
-            throw runtime_error("Unable to mmap file for file_vector resize.");
+            if (new_values == nullptr) {
+                throw runtime_error("Unable to mmap file for file_vector resize.");
+            }
         }
 
         // Third, unmap the file from the old address.
         if (reserved > 0) {
-            if (munmap(values, reserved * value_size) == -1) {
-                if (munmap(new_values, size) == -1) {
+            if (values != nullptr && munmap(values, reserved * value_size) == -1) {
+                if (new_values != nullptr && munmap(new_values, size) == -1) {
                     throw runtime_error(
                         "Unable to munmap file while "
                         "handling failed munmap for file_vector."
@@ -215,6 +221,42 @@ template <typename T> class file_vector {
 
 public:
 
+    void close() {
+        if (values != nullptr) {
+            if (munmap(values, reserved * value_size) == -1) {
+                throw runtime_error("Unable to munmap file when closing file_vector.");
+            }
+            values = nullptr;
+        }
+        if (fd != -1) {
+            if (ftruncate(fd, used * value_size) == -1) {
+                throw runtime_error("Unable to reused file when closing file_vector.");
+            }
+            if (::close(fd) == -1) {
+                throw runtime_error("Unable to close file when closing file_vector.");
+            }
+            fd = -1;
+        }
+        reserved = 0;
+        used = 0;
+    }
+
+    virtual ~file_vector() noexcept {
+        if (values != nullptr) {
+            if (values != nullptr) {
+                munmap(values, reserved);
+                values = nullptr;
+            }
+            if (fd != -1) {
+                ftruncate(fd, used * value_size);
+                ::close(fd);
+                fd = -1;
+            }
+            reserved = 0;
+            used = 0;
+        }
+    }
+
     //------------------------------------------------------------------------
     // Vectors are provided with value identity, so vectors are equal if their
     // contents are equal, and assignment copies contents from one vector to
@@ -223,22 +265,26 @@ public:
     //
     // file_vector<T> dst_file("dst_file", file_vector<T>("src_file"));
     
-    file_vector(string const& name) : name(name) {
+    file_vector(string const& name)
+    : name(name), reserved(0), used(0), fd(-1), values(nullptr) {
         map_file_into_memory();
     }
 
-    file_vector(string const& name, const int n) : name(name) {
+    file_vector(string const& name, const int n)
+    : name(name), reserved(0), used(0), fd(-1), values(nullptr) {
         map_file_into_memory();
         assign(n);
     }
 
-    file_vector(string const& name, const int n, const_reference value) : name(name) {
+    file_vector(string const& name, const int n, const_reference value)
+     : name(name), reserved(0), used(0), fd(-1), values(nullptr) {
         map_file_into_memory();
         assign(n, value);
     }
 
     template <typename InputIterator>
-    file_vector(string const& name, InputIterator first, InputIterator last) : name(name) {
+    file_vector(string const& name, InputIterator first, InputIterator last)
+    : name(name), reserved(0), used(0), fd(-1), values(nullptr) {
         assert (first <= last);
 
         map_file_into_memory();
@@ -256,32 +302,6 @@ public:
 
     file_vector(string const& name, vector<value_type> const& src)
     : file_vector(name, src.cbegin(), src.cend()) {}
-
-    virtual ~file_vector() noexcept {
-        if (values != nullptr) {
-            munmap(values, reserved);
-            ftruncate(fd, used * value_size);
-            ::close(fd);
-            values = nullptr;
-            used = 0;
-        }
-    }
-
-    void close() {
-        if (values != nullptr) {
-            if (munmap(values, reserved * value_size) == -1) {
-                throw runtime_error("Unable to munmap file when closing file_vector.");
-            }
-            if (ftruncate(fd, used * value_size) == -1) {
-                throw runtime_error("Unable to reused file when closing file_vector.");
-            }
-            if (::close(fd) == -1) {
-                throw runtime_error("Unable to close file when closing file_vector.");
-            }
-            values = nullptr;
-            used = 0;
-        }
-    }
 
     // Value equality.
     bool operator== (file_vector const& that) const {
