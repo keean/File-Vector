@@ -1,3 +1,4 @@
+#include <vector>
 #include <stdexcept>
 #include <type_traits>
 #include <algorithm>
