@@ -236,25 +236,25 @@ public:
         assign(n, value);
     }
 
-    file_vector(string const& name, file_vector const& from) : name(name) {
+    template <typename InputIterator>
+    file_vector(string const& name, InputIterator first, InputIterator last) : name(name) {
+        assert (first <= last);
+
         map_file_into_memory();
-        assign(from.cbegin(), from.cend());
+        assign(first, last);
     }
 
-    file_vector(string const& name, file_vector&& from) : name(name) {
-        map_file_into_memory();
-        assign(from.cbegin(), from.cend());
-    }
+    file_vector(string const& name, file_vector const& from)
+    : file_vector(name, from.cbegin(), from.cend()) {}
 
-    file_vector(string const& name, initializer_list<value_type> const& list) : name(name) {
-        map_file_into_memory();
-        assign(list);
-    }
+    file_vector(string const& name, file_vector&& from) 
+    : file_vector(name, from.cbegin(), from.cend()) {}
 
-    file_vector(string const& name, vector<value_type> const& src) : name(name) {
-        map_file_into_memory();
-        assign(src.cbegin(), src.cend());
-    }
+    file_vector(string const& name, initializer_list<value_type> const& list)
+    : file_vector(name, list.begin(), list.end()) {}
+
+    file_vector(string const& name, vector<value_type> const& src)
+    : file_vector(name, src.cbegin(), src.cend()) {}
 
     virtual ~file_vector() noexcept {
         if (values != nullptr) {
@@ -607,6 +607,8 @@ public:
     //------------------------------------------------------------------------
     
     template <typename I> bool range_same(I first, I last, const_iterator with) const {
+        assert(first < last);
+
         while (first != last) {
             if (*first++ != *with++) {
                 return false;
@@ -671,10 +673,14 @@ public:
 
     // Unchecked access
     const_reference operator[] (int const i) const {
+        assert(0 <= i && i < used);
+
         return values[i];
     }
 
     reference operator[] (int const i) {
+        assert(0 <= i && i < used);
+
         return values[i];
     }
 
@@ -695,18 +701,26 @@ public:
 
     // Unchecked front and back
     const_reference front() const {
+        assert(used > 0);
+
         return values[0];
     }
 
     reference front() {
+        assert(used > 0);
+
         return values[0];
     }
 
     const_reference back() const {
+        assert(used > 0);
+
         return values[used - 1];
     }
 
     reference back() {
+        assert(used > 0);
+
         return values[used - 1];
     }
 
@@ -722,7 +736,10 @@ public:
     //------------------------------------------------------------------------
     // Modifiers
     
-    template <typename InputIterator> void assign(InputIterator first, InputIterator last) {
+    template <typename InputIterator>
+    void assign(InputIterator first, InputIterator last) {
+        assert(first <= last);
+
         difference_type const size = last - first;
 
         if (size < used) {
@@ -777,7 +794,9 @@ public:
 
             if (size > used) {
                 reserve(size - used);
-                construct<value_type>::many(values + used, values + size, value);
+                construct<value_type>::many(
+                    values + used, values + size, value
+                );
             }
         }
         
@@ -803,7 +822,13 @@ public:
     //------------------------------------------------------------------------
 
     // Fill
-    iterator insert(const_iterator position, size_type n, value_type const& value) {
+    iterator insert(
+        const_iterator position, size_type n, value_type const& value
+    ) {
+        assert(
+            values <= position.values &&
+            position.values <= values + used
+        );
 
         // cannot use position after reserve, must use offset.
         difference_type const offset = position.values - values;
@@ -842,12 +867,22 @@ public:
 
     // Single element 
     iterator insert(const_iterator position, value_type const& value) {
+        assert(
+            values <= position.values &&
+            position.values <= values + used
+        );
+
         return insert(position, 1, value);
     }
 
     // Range
     template <typename I, typename = typename I::iterator_category>
     iterator insert(const_iterator position, I first, I last) {
+        assert(
+            values <= position.values &&
+            position.values <= values + used &&
+            first <= last
+        );
 
         // cannot use position after reserve, must use offset.
         difference_type const offset = position.values - values;
@@ -886,7 +921,14 @@ public:
     }
 
     // Initialiser List
-    iterator insert(const_iterator position, initializer_list<value_type> list) {
+    iterator insert(
+        const_iterator position, initializer_list<value_type> list
+    ) {
+        assert(
+            values <= position.values &&
+            position.values <= values + used
+        );
+
         return insert(position, list.begin(), list.end());
     }
 
@@ -895,7 +937,10 @@ public:
     //------------------------------------------------------------------------
   
     iterator erase(const_iterator position) {
-        assert(values <= position.values && position.values < values + used);
+        assert(
+            values <= position.values &&
+            position.values < values + used
+        );
 
         difference_type const offset = position.values - values;
          
@@ -906,7 +951,11 @@ public:
     }
 
     iterator erase(const_iterator first, const_iterator last) {
-        assert(values <= first.values && first.values < values + used);
+        assert(
+            values <= first.values &&
+            first.values <= last.values &&
+            last.values < values + used
+        );
 
         difference_type const offset = first.values - values;
         size_type const n = last - first;
@@ -929,17 +978,25 @@ public:
     
     template <typename... Args> void emplace_back(Args&&... args) {
         reserve(1);
-        construct<value_type>::single(values + (used++), forward<Args>(args)...);
+        construct<value_type>::single(
+            values + (used++), forward<Args>(args)...
+        );
     }
         
-    template <typename... Args> iterator emplace(const_iterator position, Args&&... args) {
-        assert(values <= position.values && position.values < values + used);
+    template <typename... Args>
+    iterator emplace(const_iterator position, Args&&... args) {
+        assert(
+            values <= position.values &&
+            position.values < values + used
+        );
 
         difference_type const offset = position.values - values;
 
         reserve(1);
         if (offset == used) {
-            construct<value_type>::single(values + used, forward<Args>(args)...);
+            construct<value_type>::single(
+                values + used, forward<Args>(args)...
+            );
         } else {
             construct<value_type>::single(values + used, values[used - 1]);
             copy_backward(values + offset, values + used - 1, values + used); 
