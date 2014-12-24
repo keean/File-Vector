@@ -1,3 +1,6 @@
+#ifndef FILE_VECTOR_HPP
+#define FILE_VECTOR_HPP
+
 #include <vector>
 #include <stdexcept>
 #include <type_traits>
@@ -1035,3 +1038,4 @@ template <typename T> void swap (file_vector<T>& a, file_vector<T>& b) {
     b = tmp;
 }
 
+#endif
