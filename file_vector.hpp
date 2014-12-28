@@ -407,6 +407,21 @@ public:
         return iterator(values + used);
     }
 
+    class range {
+        friend file_vector;
+        range(iterator const &f, iterator const &l) : first(f), last(l) {}
+
+    public:    
+        using iterator = iterator;
+
+        iterator const first;
+        iterator const last;
+    };
+
+    range all() const {
+        return range(begin(), end());
+    }
+
     //------------------------------------------------------------------------
     // Reverse Iterator
     
@@ -482,6 +497,21 @@ public:
         return reverse_iterator(values - 1);
     }
 
+    class reverse_range {
+        friend file_vector;
+        reverse_range(reverse_iterator const &f, reverse_iterator const &l) : first(f), last(l) {}
+
+    public:    
+        using iterator = reverse_iterator;
+
+        reverse_iterator const first;
+        reverse_iterator const last;
+    };
+
+    reverse_range reverse_all() const {
+        return reverse_range(rbegin(), rend());
+    }
+
     //------------------------------------------------------------------------
     // Constant Iterator
     
@@ -555,6 +585,21 @@ public:
         return const_iterator(values + used);
     }
 
+    class const_range {
+        friend file_vector;
+        const_range(const_iterator const &f, const_iterator const &l) : first(f), last(l) {}
+
+    public:    
+        using iterator = const_iterator;
+
+        const_iterator const first;
+        const_iterator const last;
+    };
+
+    const_range const_all() const {
+        return const_range(cbegin(), cend());
+    }
+
     //------------------------------------------------------------------------
     // Constant Reverse Iterator
     
@@ -626,6 +671,22 @@ public:
 
     const_reverse_iterator crend() const {
         return const_reverse_iterator(values - 1);
+    }
+
+    class const_reverse_range {
+        friend file_vector;
+        const_reverse_range(const_reverse_iterator const &f, const_reverse_iterator const &l)
+            : first(f), last(l) {}
+
+    public:    
+        using iterator = const_reverse_iterator;
+
+        const_reverse_iterator const first;
+        const_reverse_iterator const last;
+    };
+
+    const_reverse_range const_reverse_all() const {
+        return const_reverse_range(crbegin(), crend());
     }
 
     //------------------------------------------------------------------------
