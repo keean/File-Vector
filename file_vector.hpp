@@ -233,7 +233,7 @@ public:
         }
         if (fd != -1) {
             if (ftruncate(fd, used * value_size) == -1) {
-                throw runtime_error("Unable to reused file when closing file_vector.");
+                throw runtime_error("Unable to resize file when closing file_vector.");
             }
             if (::close(fd) == -1) {
                 throw runtime_error("Unable to close file when closing file_vector.");
