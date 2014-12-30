@@ -16,10 +16,13 @@ extern "C" {
 using namespace std;
 
 // Use should be limited to data that does not contain pointers.
-// Unfortunately there is no way to express this constraint using
-// type_traits that could enforce this rule.
+// The template stops trivial pointers and references,
+// but not ones embedded in structs.
 
-template <typename T> class file_vector {
+template <typename T, typename = void> class file_vector;
+
+template <typename T>
+class file_vector<T, typename enable_if<!(is_pointer<T>::value || is_reference<T>::value)>::type> {
     using value_type = T;
     using reference = T&;
     using const_reference = T const&;
