@@ -339,18 +339,21 @@ public:
     // Iterator
 
     class iterator {
+    public:
+        using difference_type = file_vector::difference_type;
+        using value_type = file_vector::value_type;
+        using reference = file_vector::reference;
+        using pointer = file_vector::pointer;
+        using iterator_category = random_access_iterator_tag;
+
+    private:
         friend file_vector;
         pointer values;
 
         iterator(pointer values) : values(values)
             {}
-    public:
-        using difference_type = difference_type;
-        using value_type = value_type;
-        using reference = reference;
-        using pointer = pointer;
-        using iterator_category = random_access_iterator_tag;
 
+    public:
         // All Iterators
         iterator(iterator const &that) : values(that.values)
             {}
@@ -411,12 +414,14 @@ public:
     }
 
     class range {
+    public:    
+        using iterator = file_vector::iterator;
+
+    private:
         friend file_vector;
         range(iterator const &f, iterator const &l) : first(f), last(l) {}
 
     public:    
-        using iterator = iterator;
-
         iterator const first;
         iterator const last;
     };
@@ -429,18 +434,21 @@ public:
     // Reverse Iterator
     
     class reverse_iterator {
-        friend file_vector;
-        pointer values;
-
-        reverse_iterator(pointer values) : values(values)
-            {}
     public:
-        using difference_type = difference_type;
-        using value_type = value_type;
-        using reference = reference;
-        using pointer = pointer;
+        using difference_type = file_vector::difference_type;
+        using value_type = file_vector::value_type;
+        using reference = file_vector::reference;
+        using pointer = file_vector::pointer;
         using iterator_category = random_access_iterator_tag;
 
+    private:
+        friend file_vector;
+        file_vector::pointer values;
+
+        reverse_iterator(file_vector::pointer values) : values(values)
+            {}
+
+    public:
         // All Iterators
         reverse_iterator(reverse_iterator const &that) : values(that.values)
             {}
@@ -505,7 +513,7 @@ public:
         reverse_range(reverse_iterator const &f, reverse_iterator const &l) : first(f), last(l) {}
 
     public:    
-        using iterator = reverse_iterator;
+        using iterator = file_vector::reverse_iterator;
 
         reverse_iterator const first;
         reverse_iterator const last;
@@ -519,18 +527,20 @@ public:
     // Constant Iterator
     
     class const_iterator {
+    public:
+        using difference_type = file_vector::difference_type;
+        using value_type = file_vector::value_type;
+        using reference = file_vector::const_reference;
+        using pointer = file_vector::const_pointer;
+        using iterator_category = random_access_iterator_tag;
+
+    private:
         friend file_vector;
         const_pointer values;
 
         const_iterator(const_pointer values) : values(values)
             {}
     public:
-        using difference_type = difference_type;
-        using value_type = value_type;
-        using reference = const_reference;
-        using pointer = const_pointer;
-        using iterator_category = random_access_iterator_tag;
-
         // All Iterators
         const_iterator(const_iterator const &that) : values(that.values)
             {}
@@ -593,7 +603,7 @@ public:
         const_range(const_iterator const &f, const_iterator const &l) : first(f), last(l) {}
 
     public:    
-        using iterator = const_iterator;
+        using iterator = file_vector::const_iterator;
 
         const_iterator const first;
         const_iterator const last;
@@ -607,18 +617,21 @@ public:
     // Constant Reverse Iterator
     
     class const_reverse_iterator {
+    public:
+        using difference_type = file_vector::difference_type;
+        using value_type = file_vector::value_type;
+        using reference = file_vector::const_reference;
+        using pointer = file_vector::const_pointer;
+        using iterator_category = random_access_iterator_tag;
+
+    private:
         friend file_vector;
         const_pointer values;
 
         const_reverse_iterator(const_pointer values) : values(values)
             {}
-    public:
-        using difference_type = difference_type;
-        using value_type = value_type;
-        using reference = const_reference;
-        using pointer = const_pointer;
-        using iterator_category = random_access_iterator_tag;
 
+    public:
         // All Iterators
         const_reverse_iterator(const_reverse_iterator const &that) : values(that.values)
             {}
@@ -682,7 +695,7 @@ public:
             : first(f), last(l) {}
 
     public:    
-        using iterator = const_reverse_iterator;
+        using iterator = file_vector::const_reverse_iterator;
 
         const_reverse_iterator const first;
         const_reverse_iterator const last;
