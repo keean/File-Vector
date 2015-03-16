@@ -7,8 +7,9 @@ extern "C" {
 }
 
 using namespace std;
+using fv_int = file_vector<int>;
 
-void test_out_of_range(file_vector<int>& fv, int const i) {
+void test_out_of_range(fv_int& fv, int const i) {
     try { 
         int const tmp = fv.at(i);
     } catch (out_of_range const& e) {
@@ -21,7 +22,7 @@ void test_out_of_range(file_vector<int>& fv, int const i) {
 
 int main() {
     size_t const page_size = getpagesize();
-    file_vector<int> vector_test1("test1");
+    fv_int vector_test1("test1", fv_int::create_file);
 
     vector_test1.clear();
 
@@ -39,7 +40,7 @@ int main() {
     }
 
     for (
-        file_vector<int>::iterator i {vector_test1.begin()};
+        fv_int::iterator i {vector_test1.begin()};
         i != vector_test1.end();
         ++i
     ) {
@@ -50,7 +51,7 @@ int main() {
     assert(vector_test1.size() == page_size);
      
     for (
-        file_vector<int>::const_reverse_iterator i {vector_test1.crbegin()};
+        fv_int::const_reverse_iterator i {vector_test1.crbegin()};
         i != vector_test1.crend();
         ++i
     ) {
@@ -73,7 +74,7 @@ int main() {
      
     test_out_of_range(vector_test1, 2 * page_size);
 
-    file_vector<int> vector_test2("test2");
+    fv_int vector_test2("test2", fv_int::create_file);
     vector_test2.assign(vector_test1.cbegin(), vector_test1.cend());
 
     vector_test1.close();
@@ -89,7 +90,7 @@ int main() {
     };
 
     int_obj io {3};
-    file_vector<int_obj> vector_test3("test3");
+    file_vector<int_obj> vector_test3("test3", fv_int::create_file);
     vector_test3.clear();
 
     for (int i = 0; i < page_size; ++i) {
@@ -100,7 +101,7 @@ int main() {
         assert(vector_test3[i] == io);
     }
 
-    file_vector<int_obj> vector_test4("test4");
+    file_vector<int_obj> vector_test4("test4", fv_int::create_file);
     vector_test4 = vector_test3;
 
     for (int i = 0; i < vector_test4.size(); ++i) {
@@ -116,7 +117,7 @@ int main() {
     }
     assert(vector_test4.back() == int_obj(999));
 
-    file_vector<int_obj> vector_test5("test5", vector_test4);
+    file_vector<int_obj> vector_test5("test5", vector_test4, fv_int::create_file);
 
     vector_test5.emplace_back(888);
     assert(vector_test5.back() == int_obj(888));
@@ -136,12 +137,12 @@ int main() {
     vector_test4.close();
     vector_test5.close();
 
-    file_vector<int> vector_test6("test6");
+    fv_int vector_test6("test6", fv_int::create_file);
     vector_test6.assign({1,2,3,4,5,6,7,8,9});
     vector_test6.close();
 
-    file_vector<int> b("test7", {9,8,7,6,5,4,3,2,1,0});
-    file_vector<int> a("test8", file_vector<int>("test6"));
+    fv_int b("test7", {9,8,7,6,5,4,3,2,1,0}, fv_int::create_file);
+    fv_int a("test8", fv_int("test6"), fv_int::create_file);
 
     a.insert(a.cbegin(), 999); 
     assert(a == vector<int>({999, 1, 2, 3, 4, 5, 6, 7, 8, 9}));
