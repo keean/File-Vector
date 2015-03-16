@@ -118,6 +118,7 @@ class file_vector<T, typename enable_if<!(is_pointer<T>::value || is_reference<T
     
     static size_type constexpr value_size = sizeof(T);
 
+    int const mode;
     string const name;
     size_type reserved;
     size_type used;
@@ -125,7 +126,11 @@ class file_vector<T, typename enable_if<!(is_pointer<T>::value || is_reference<T
     pointer values;
 
     void map_file_into_memory() {
-        fd = open(name.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
+        int flags = O_RDWR;
+        if (mode & create_file) {
+            flags |= O_CREAT;
+        }
+        fd = open(name.c_str(), flags, S_IRUSR | S_IWUSR);
 
         if (fd == -1) {
             throw runtime_error("Unable to open file for file_vector.");
@@ -226,6 +231,7 @@ class file_vector<T, typename enable_if<!(is_pointer<T>::value || is_reference<T
     }
 
 public:
+    static int constexpr create_file = 1;
 
     void close() {
         if (values != nullptr) {
@@ -254,7 +260,9 @@ public:
                 values = nullptr;
             }
             if (fd != -1) {
-                ftruncate(fd, used * value_size);
+                if (ftruncate(fd, used * value_size) == -1) {
+                    // ignore.
+                }
                 ::close(fd);
                 fd = -1;
             }
@@ -271,43 +279,43 @@ public:
     //
     // file_vector<T> dst_file("dst_file", file_vector<T>("src_file"));
     
-    file_vector(string const& name)
-    : name(name), reserved(0), used(0), fd(-1), values(nullptr) {
+    file_vector(string const& name, int mode = 0)
+    : mode(mode), name(name), reserved(0), used(0), fd(-1), values(nullptr) {
         map_file_into_memory();
     }
 
-    file_vector(string const& name, const int n)
-    : name(name), reserved(0), used(0), fd(-1), values(nullptr) {
+    file_vector(string const& name, size_t n, int mode = 0)
+    : mode(mode), name(name), reserved(0), used(0), fd(-1), values(nullptr) {
         map_file_into_memory();
         assign(n);
     }
 
-    file_vector(string const& name, const int n, const_reference value)
-     : name(name), reserved(0), used(0), fd(-1), values(nullptr) {
+    file_vector(string const& name, size_t n, const_reference value, int mode = 0)
+     : mode(mode), name(name), reserved(0), used(0), fd(-1), values(nullptr) {
         map_file_into_memory();
         assign(n, value);
     }
 
     template <typename InputIterator>
-    file_vector(string const& name, InputIterator first, InputIterator last)
-    : name(name), reserved(0), used(0), fd(-1), values(nullptr) {
+    file_vector(string const& name, InputIterator first, InputIterator last, int mode = 0)
+    : mode(mode), name(name), reserved(0), used(0), fd(-1), values(nullptr) {
         assert (first <= last);
 
         map_file_into_memory();
         assign(first, last);
     }
 
-    file_vector(string const& name, file_vector const& from)
-    : file_vector(name, from.cbegin(), from.cend()) {}
+    file_vector(string const& name, file_vector const& from, int mode = 0)
+    : file_vector(name, from.cbegin(), from.cend(), mode) {}
 
-    file_vector(string const& name, file_vector&& from) 
-    : file_vector(name, from.cbegin(), from.cend()) {}
+    file_vector(string const& name, file_vector&& from, int mode = 0) 
+    : file_vector(name, from.cbegin(), from.cend(), mode) {}
 
-    file_vector(string const& name, initializer_list<value_type> const& list)
-    : file_vector(name, list.begin(), list.end()) {}
+    file_vector(string const& name, initializer_list<value_type> const& list, int mode = 0)
+    : file_vector(name, list.begin(), list.end(), mode) {}
 
-    file_vector(string const& name, vector<value_type> const& src)
-    : file_vector(name, src.cbegin(), src.cend()) {}
+    file_vector(string const& name, vector<value_type> const& src, int mode = 0)
+    : file_vector(name, src.cbegin(), src.cend(), mode) {}
 
     // Value equality.
     bool operator== (file_vector const& that) const {
